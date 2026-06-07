@@ -79,19 +79,24 @@ export default function Home() {
     setExplanation('All filters cleared.');
   };
 
-  const isActive = (key: string, value: any): boolean => {
-    return (filterState as any)[key] === value;
+  type ToggleableKey = Exclude<keyof FilterState, 'brightness'>;
+  type ToggleableValue = string | boolean;
+
+  const isActive = (key: ToggleableKey, value: ToggleableValue): boolean => {
+    if (key === 'colorMode') return filterState.colorMode === value;
+    if (key === 'zoom') return filterState.zoom === value;
+    return filterState[key] === value;
   };
 
-  const toggleAdaptation = (key: string, value: any) => {
+  const toggleAdaptation = (key: ToggleableKey, value: ToggleableValue) => {
     setFilterState(prev => {
       const next = { ...prev };
-      const currently = (prev as any)[key];
-      if (key === 'colorMode' || key === 'zoom') {
-        (next as any)[key] = currently === value ? null : value;
-      } else {
-        (next as any)[key] = !currently;
-      }
+      if (key === 'colorMode') next.colorMode = (prev.colorMode === value ? null : value) as FilterState['colorMode'];
+      else if (key === 'zoom') next.zoom = (prev.zoom === value ? null : value) as FilterState['zoom'];
+      else if (key === 'darkMode') next.darkMode = !prev.darkMode;
+      else if (key === 'highContrast') next.highContrast = !prev.highContrast;
+      else if (key === 'warmTone') next.warmTone = !prev.warmTone;
+      else if (key === 'invertColors') next.invertColors = !prev.invertColors;
       applyFilters(next);
       return next;
     });
