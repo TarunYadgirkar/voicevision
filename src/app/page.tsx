@@ -120,6 +120,12 @@ export default function Home() {
           <p className="text-gray-500 mt-2 text-lg">
             Speak your visual needs. AI adapts the screen instantly.
           </p>
+          <div className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[11px]">
+            <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+            </svg>
+            Free tier: 20 voice requests/day — use sidebar buttons for unlimited access
+          </div>
         </div>
 
         {/* Main layout: Control card + Supported adaptations sidebar */}
