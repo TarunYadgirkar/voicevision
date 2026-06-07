@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     if (!raw.trim()) {
       const part = response.candidates?.[0]?.content?.parts?.find(
-        (p: any) => !p.thought && p.text
+        (p: { thought?: boolean; text?: string }) => !p.thought && p.text
       );
       raw = part?.text ?? '';
     }
@@ -102,22 +102,23 @@ export async function POST(req: NextRequest) {
     const allKeys = ['colorMode', ...boolKeys, 'brightness', 'zoom'] as const;
 
     const hasPositive = allKeys.some(k => {
-      const v = (command as any)[k];
+      const v = command[k];
       return v !== null && v !== undefined && v !== false;
     });
 
     if (hasPositive) {
       for (const key of boolKeys) {
         if (command[key] === false) {
-          (command as any)[key] = null;
+          command[key] = null;
         }
       }
     }
 
     return NextResponse.json(command, { headers: CORS_HEADERS });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Gemini error:', err);
-    const status = err?.status || err?.httpStatusCode || 500;
+    const errShape = err as { status?: number; httpStatusCode?: number } | null;
+    const status = errShape?.status || errShape?.httpStatusCode || 500;
     if (status === 429) {
       return NextResponse.json(
         { error: 'Rate limit reached — try again in a minute' },

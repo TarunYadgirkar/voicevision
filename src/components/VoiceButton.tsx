@@ -37,8 +37,9 @@ export function VoiceButton({ onCommand, onTranscript }: Props) {
         onCommand(cmd);
         setLoading(false);
       })
-      .catch((err: any) => {
-        setError(err?.message || 'Connection error — try again');
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
+        setError(message || 'Connection error — try again');
         setLoading(false);
       });
   }, [transcript]);
