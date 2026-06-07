@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useSyncExternalStore } from 'react';
 
 interface UseSpeechRecognitionReturn {
   transcript: string;
@@ -8,22 +8,24 @@ interface UseSpeechRecognitionReturn {
   supported: boolean;
 }
 
+type SpeechRecognitionWindow = typeof window & {
+  webkitSpeechRecognition?: new () => SpeechRecognition;
+};
+
+const noopSubscribe = () => () => {};
+const getSupportSnapshot = () =>
+  'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+const getServerSupportSnapshot = () => false;
+
 export function useSpeechRecognition(): UseSpeechRecognitionReturn {
   const [transcript, setTranscript] = useState('');
   const [listening, setListening] = useState(false);
-  const [supported, setSupported] = useState(false);
+  const supported = useSyncExternalStore(noopSubscribe, getSupportSnapshot, getServerSupportSnapshot);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-
-  useEffect(() => {
-    setSupported(
-      'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
-    );
-  }, []);
 
   const startListening = useCallback(() => {
     if (typeof window === 'undefined') return;
-    const SR =
-      window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SR = window.SpeechRecognition || (window as SpeechRecognitionWindow).webkitSpeechRecognition;
     if (!SR) return;
 
     if (recognitionRef.current) recognitionRef.current.abort();
