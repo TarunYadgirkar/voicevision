@@ -51,12 +51,17 @@ DISPLAY COMFORT:
 RESET:
 - "reset", "normal", "clear", "undo", "go back", "turn everything off", "start over", "remove all filters" → reset: true, all other fields null
 
-IMPORTANT:
-- Compound commands set multiple fields at once (e.g., "dark and high contrast" → darkMode: true, highContrast: true)
-- The user may describe symptoms instead of naming conditions — infer the best adaptation
+CRITICAL RULES:
+- COMPOUND COMMANDS: Users often mention MULTIPLE conditions at once. You MUST set ALL relevant fields simultaneously. Examples:
+  * "I have deuteranopia and tunnel vision" → colorMode: "deuteranopia", zoom: "peripheral"
+  * "dark mode and high contrast" → darkMode: true, highContrast: true
+  * "I'm colorblind and the screen is too bright" → colorMode: "deuteranopia", darkMode: true, brightness: 0.6
+  * "macular degeneration and everything is washed out" → zoom: "center", highContrast: true
+- Fields not mentioned should be null (NEVER false) so they don't override existing state
 - reset is always boolean, never null
-- Fields not mentioned should be null (not false) so they don't override existing state
-- If the user asks to remove/disable ONE specific filter (e.g., "turn off dark mode"), set ONLY that field to its off value (false/null) and leave everything else null`;
+- The user may describe symptoms instead of naming conditions — infer the best adaptation
+- If the user asks to remove/disable ONE specific filter (e.g., "turn off dark mode"), set ONLY that field to its off value (false/null) and leave everything else null
+- NEVER return false for fields the user didn't mention — use null instead`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -76,10 +81,49 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const command: AccessibilityCommand = JSON.parse(response.text ?? '{}');
+    let raw = response.text ?? '';
+
+    if (!raw.trim()) {
+      const part = response.candidates?.[0]?.content?.parts?.find(
+        (p: any) => !p.thought && p.text
+      );
+      raw = part?.text ?? '';
+    }
+
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error('No JSON in Gemini response:', raw);
+      return NextResponse.json({ error: 'Failed to interpret command' }, { status: 500, headers: CORS_HEADERS });
+    }
+
+    const command: AccessibilityCommand = JSON.parse(jsonMatch[0]);
+
+    const boolKeys = ['darkMode', 'highContrast', 'warmTone', 'invertColors'] as const;
+    const allKeys = ['colorMode', ...boolKeys, 'brightness', 'zoom'] as const;
+
+    const hasPositive = allKeys.some(k => {
+      const v = (command as any)[k];
+      return v !== null && v !== undefined && v !== false;
+    });
+
+    if (hasPositive) {
+      for (const key of boolKeys) {
+        if (command[key] === false) {
+          (command as any)[key] = null;
+        }
+      }
+    }
+
     return NextResponse.json(command, { headers: CORS_HEADERS });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Gemini error:', err);
+    const status = err?.status || err?.httpStatusCode || 500;
+    if (status === 429) {
+      return NextResponse.json(
+        { error: 'Rate limit reached — try again in a minute' },
+        { status: 429, headers: CORS_HEADERS }
+      );
+    }
     return NextResponse.json({ error: 'Failed to interpret command' }, { status: 500, headers: CORS_HEADERS });
   }
 }

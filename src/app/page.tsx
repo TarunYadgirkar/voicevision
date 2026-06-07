@@ -44,14 +44,17 @@ export default function Home() {
     }
 
     setFilterState(prev => {
+      const merge = <T,>(val: T | null | undefined, fallback: T): T =>
+        val !== null && val !== undefined ? val : fallback;
+
       const next: FilterState = {
-        colorMode: cmd.colorMode ?? prev.colorMode,
-        darkMode: cmd.darkMode ?? prev.darkMode,
-        highContrast: cmd.highContrast ?? prev.highContrast,
-        brightness: cmd.brightness ?? prev.brightness,
-        warmTone: cmd.warmTone ?? prev.warmTone,
-        invertColors: cmd.invertColors ?? prev.invertColors,
-        zoom: cmd.zoom ?? prev.zoom,
+        colorMode: merge(cmd.colorMode, prev.colorMode),
+        darkMode: merge(cmd.darkMode, prev.darkMode),
+        highContrast: merge(cmd.highContrast, prev.highContrast),
+        brightness: merge(cmd.brightness, prev.brightness),
+        warmTone: merge(cmd.warmTone, prev.warmTone),
+        invertColors: merge(cmd.invertColors, prev.invertColors),
+        zoom: merge(cmd.zoom, prev.zoom),
       };
       applyFilters(next);
       return next;

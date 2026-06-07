@@ -11,10 +11,12 @@ interface Props {
 export function VoiceButton({ onCommand, onTranscript }: Props) {
   const { transcript, listening, startListening, supported } = useSpeechRecognition();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!transcript) return;
     onTranscript(transcript);
+    setError('');
     setLoading(true);
 
     fetch('/api/interpret', {
@@ -22,12 +24,23 @@ export function VoiceButton({ onCommand, onTranscript }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ transcript }),
     })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) return r.json().then(body => { throw { status: r.status, message: body?.error }; });
+        return r.json();
+      })
       .then(cmd => {
+        if (cmd.error) {
+          setError(cmd.error);
+          setLoading(false);
+          return;
+        }
         onCommand(cmd);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err: any) => {
+        setError(err?.message || 'Connection error — try again');
+        setLoading(false);
+      });
   }, [transcript]);
 
   if (!supported) {
@@ -81,6 +94,9 @@ export function VoiceButton({ onCommand, onTranscript }: Props) {
       }`}>
         {listening ? 'Listening...' : loading ? 'Processing...' : 'Tap to speak'}
       </span>
+      {error && (
+        <span className="text-xs text-red-500 animate-fade-in-up">{error}</span>
+      )}
     </div>
   );
 }
