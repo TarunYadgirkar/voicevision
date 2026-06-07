@@ -13,31 +13,27 @@ const MODE_LABELS: Record<string, string> = {
   achromatopsia: 'Grayscale',
 };
 
-const MODE_ICONS: Record<string, string> = {
-  deuteranopia: '🔴🟢',
-  protanopia: '🔴',
-  tritanopia: '🔵🟡',
-  achromatopsia: '⚫',
-  'Dark Mode': '🌙',
-  'High Contrast': '◐',
-  'Warm Tone': '🔆',
-  'Inverted': '🔄',
+const ZOOM_LABELS: Record<string, { label: string; icon: string }> = {
+  center: { label: 'Macular Degeneration', icon: '🔍' },
+  peripheral: { label: 'Tunnel Vision', icon: '🔭' },
+  full: { label: 'Full Zoom', icon: '🔎' },
 };
 
 export function ActiveModes({ state, onReset }: Props) {
   const active: { label: string; icon: string }[] = [];
-  if (state.colorMode) active.push({ label: MODE_LABELS[state.colorMode], icon: MODE_ICONS[state.colorMode] });
+  if (state.colorMode) active.push({ label: MODE_LABELS[state.colorMode], icon: state.colorMode === 'achromatopsia' ? '⚫' : '🎨' });
   if (state.darkMode) active.push({ label: 'Dark Mode', icon: '🌙' });
   if (state.highContrast) active.push({ label: 'High Contrast', icon: '◐' });
   if (state.warmTone) active.push({ label: 'Warm Tone', icon: '🔆' });
   if (state.invertColors) active.push({ label: 'Inverted', icon: '🔄' });
   if (state.brightness !== null) active.push({ label: `Brightness ${Math.round(state.brightness * 100)}%`, icon: '☀️' });
+  if (state.zoom) active.push(ZOOM_LABELS[state.zoom]);
 
   if (!active.length) {
     return (
       <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
         <span className="w-2 h-2 rounded-full bg-gray-300" />
-        No filters active — try &ldquo;dark mode&rdquo; or &ldquo;red-green colorblind&rdquo;
+        No filters active — try &ldquo;dark mode&rdquo; or &ldquo;I have tunnel vision&rdquo;
       </div>
     );
   }

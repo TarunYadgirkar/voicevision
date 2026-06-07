@@ -31,6 +31,7 @@ export default function Home() {
         brightness: cmd.brightness ?? prev.brightness,
         warmTone: cmd.warmTone ?? prev.warmTone,
         invertColors: cmd.invertColors ?? prev.invertColors,
+        zoom: cmd.zoom ?? prev.zoom,
       };
       applyFilters(next);
       return next;
@@ -204,6 +205,9 @@ export default function Home() {
               'Make it dark mode',
               'Too bright, hurts my eyes',
               'High contrast please',
+              'I have macular degeneration',
+              'I have tunnel vision',
+              'Zoom in on everything',
               'I\'m light sensitive',
               'Reset to normal',
             ].map(phrase => (

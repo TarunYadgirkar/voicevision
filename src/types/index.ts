@@ -17,6 +17,7 @@ export interface FilterState {
   brightness: number | null;
   warmTone: boolean;
   invertColors: boolean;
+  zoom: AccessibilityCommand['zoom'];
 }
 
 export const defaultFilterState: FilterState = {
@@ -26,4 +27,5 @@ export const defaultFilterState: FilterState = {
   brightness: null,
   warmTone: false,
   invertColors: false,
+  zoom: null,
 };
