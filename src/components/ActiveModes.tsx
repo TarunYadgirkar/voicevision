@@ -47,7 +47,7 @@ export function ActiveModes({ state, onRemove, onReset, onIntensityChange }: Pro
   if (state.highContrast) active.push({ label: 'High Contrast', icon: '◐', key: 'highContrast', intensityKey: 'highContrast' });
   if (state.warmTone) active.push({ label: 'Warm Tone', icon: '🔆', key: 'warmTone', intensityKey: 'warmTone' });
   if (state.invertColors) active.push({ label: 'Inverted', icon: '🔄', key: 'invertColors', intensityKey: 'invertColors' });
-  if (state.blur) active.push({ label: 'Cataracts / Blur', icon: '🌫️', key: 'blur', intensityKey: 'blur' });
+  if (state.blur) active.push({ label: 'Cataracts (Clarity Boost)', icon: '🌗', key: 'blur', intensityKey: 'blur' });
   if (state.brightness !== null) active.push({ label: `Brightness ${Math.round(state.brightness * 100)}%`, icon: '☀️', key: 'brightness' });
   if (state.zoom) active.push({ ...ZOOM_LABELS[state.zoom], key: 'zoom', intensityKey: 'zoom' });
   if (state.hemianopia) active.push({ label: HEMIANOPIA_LABELS[state.hemianopia], icon: '🕶️', key: 'hemianopia' });

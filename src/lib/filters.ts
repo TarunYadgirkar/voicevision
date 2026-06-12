@@ -66,7 +66,12 @@ export function buildFilterString(state: FilterState): string {
   }
   if (state.warmTone) parts.push(`sepia(${Math.round(25 * intensities.warmTone)}%)`);
   if (state.highContrast) parts.push(`contrast(${Math.round(100 + 50 * intensities.highContrast)}%)`);
-  if (state.blur) parts.push(`blur(${(intensities.blur * 6).toFixed(1)}px)`);
+  // Cataracts/low vision: the page is already hazy to the user, so we boost contrast
+  // and brightness to cut through the haze rather than adding more blur on top.
+  if (state.blur) {
+    parts.push(`contrast(${Math.round(100 + 60 * intensities.blur)}%)`);
+    parts.push(`brightness(${Math.round(100 + 15 * intensities.blur)}%)`);
+  }
   if (state.brightness !== null) parts.push(`brightness(${state.brightness})`);
   if (state.darkMode && state.brightness === null) {
     parts.push(`brightness(${(1 - 0.2 * intensities.darkMode).toFixed(2)})`);
@@ -79,7 +84,8 @@ export function applyFilters(state: FilterState): void {
   updateColorMatrices(state.intensities.colorMode);
 
   const root = document.documentElement;
-  root.style.filter = buildFilterString(state);
+  // Safari (incl. iOS) does not render CSS `filter` set on <html> — apply to <body> instead.
+  document.body.style.filter = buildFilterString(state);
 
   if (state.darkMode) {
     root.style.colorScheme = 'dark';
@@ -182,7 +188,7 @@ export function applyHemianopia(side: FilterState['hemianopia']): void {
 
 export function resetFilters(): void {
   const root = document.documentElement as HTMLElement & { style: { zoom?: string } };
-  root.style.filter = 'none';
+  document.body.style.filter = 'none';
   root.style.colorScheme = '';
   root.style.zoom = '';
   root.classList.remove('vv-dark', 'vv-invert');

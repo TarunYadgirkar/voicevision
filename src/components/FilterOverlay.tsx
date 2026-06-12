@@ -2,7 +2,7 @@ export function FilterOverlay() {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      style={{ display: 'none' }}
+      style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}
       aria-hidden="true"
     >
       <defs>

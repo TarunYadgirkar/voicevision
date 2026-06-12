@@ -16,7 +16,7 @@ const SUPPORTED_ADAPTATIONS = [
     { label: 'Macular Degeneration', desc: 'Central vision loss', key: 'zoom', value: 'center' },
     { label: 'Tunnel Vision', desc: 'Peripheral vision loss', key: 'zoom', value: 'peripheral' },
     { label: 'Low Vision', desc: 'Full page magnification', key: 'zoom', value: 'full' },
-    { label: 'Cataracts', desc: 'Blurred vision', key: 'blur', value: true },
+    { label: 'Cataracts', desc: 'Boosts contrast & brightness', key: 'blur', value: true },
     { label: 'Hemianopia (Left)', desc: 'Left visual field loss', key: 'hemianopia', value: 'left' },
     { label: 'Hemianopia (Right)', desc: 'Right visual field loss', key: 'hemianopia', value: 'right' },
   ]},

@@ -121,7 +121,12 @@
     if (s.invertColors && !s.darkMode) parts.push(`invert(${Math.round(100 * intensities.invertColors)}%) hue-rotate(180deg)`);
     if (s.warmTone) parts.push(`sepia(${Math.round(25 * intensities.warmTone)}%)`);
     if (s.highContrast) parts.push(`contrast(${Math.round(100 + 50 * intensities.highContrast)}%)`);
-    if (s.blur) parts.push(`blur(${(intensities.blur * 6).toFixed(1)}px)`);
+    // Cataracts/low vision: the page is already hazy to the user, so boost contrast
+    // and brightness to cut through the haze rather than adding more blur on top.
+    if (s.blur) {
+      parts.push(`contrast(${Math.round(100 + 60 * intensities.blur)}%)`);
+      parts.push(`brightness(${Math.round(100 + 15 * intensities.blur)}%)`);
+    }
     if (s.brightness !== null) parts.push(`brightness(${s.brightness})`);
     if (s.darkMode && s.brightness === null) parts.push(`brightness(${(1 - 0.2 * intensities.darkMode).toFixed(2)})`);
     return parts.join(' ') || 'none';
@@ -129,9 +134,9 @@
 
   function applyFilters() {
     updateColorMatrices(state.intensities.colorMode);
-    const root = document.documentElement;
-    root.style.filter = buildFilterString(state);
-    root.style.colorScheme = state.darkMode ? 'dark' : '';
+    // Safari does not render CSS `filter` set on <html> — apply to <body> instead.
+    document.body.style.filter = buildFilterString(state);
+    document.documentElement.style.colorScheme = state.darkMode ? 'dark' : '';
   }
 
   // Mirrors src/lib/filters.ts applyZoom — CSS `zoom` (not transform: scale) for full
@@ -226,7 +231,7 @@
       intensities: { ...DEFAULT_INTENSITIES },
     };
     const root = document.documentElement;
-    root.style.filter = 'none';
+    document.body.style.filter = 'none';
     root.style.colorScheme = '';
     root.style.zoom = '';
     applyZoom(null, 0);

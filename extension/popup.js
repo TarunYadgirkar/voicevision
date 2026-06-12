@@ -34,7 +34,7 @@ function renderBadges(state) {
   if (state.highContrast) active.push('High Contrast');
   if (state.warmTone) active.push('Warm Tone');
   if (state.invertColors) active.push('Inverted');
-  if (state.blur) active.push('Cataracts / Blur');
+  if (state.blur) active.push('Cataracts (Clarity Boost)');
   if (state.brightness !== null && state.brightness !== undefined) active.push(`Brightness ${state.brightness}`);
   if (state.zoom) active.push(ZOOM_LABELS[state.zoom] ?? state.zoom);
   if (state.hemianopia) active.push(HEMIANOPIA_LABELS[state.hemianopia] ?? state.hemianopia);

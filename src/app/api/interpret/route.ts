@@ -48,7 +48,7 @@ COLOR VISION:
 - "mild" / "slight" version of any of the above → also set intensities.colorMode to ~0.4
 - "severe" / "total" / "complete" version → also set intensities.colorMode to 1
 
-LOW VISION / BLUR:
+LOW VISION / CATARACTS (blur field — applies a contrast/brightness clarity boost to cut through haze, NOT additional blur):
 - "cataracts", "everything is blurry/foggy/hazy", "my vision is cloudy", "can't focus" → blur: true
 
 VISUAL FIELD LOSS:
