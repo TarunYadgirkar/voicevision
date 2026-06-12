@@ -217,6 +217,19 @@
       background:linear-gradient(${gradientDir}, black 80%, transparent 100%);"></div>`;
   }
 
+  // Re-run all visual effects from the current state — used after any state change.
+  function applyAll() {
+    applyFilters();
+    applyZoom(state.zoom, state.intensities.zoom);
+    applyHemianopia(state.hemianopia);
+  }
+
+  // Persist state to chrome.storage so it carries over to new tabs/pages, and other
+  // open tabs pick it up via the onChanged listener below.
+  function persistState() {
+    chrome.storage.local.set({ vvState: state });
+  }
+
   function resetAll() {
     state = {
       colorMode: null,
@@ -237,6 +250,29 @@
     applyZoom(null, 0);
     applyHemianopia(null);
   }
+
+  // Load persisted state on page load so filters set on another page/tab apply here too.
+  chrome.storage.local.get('vvState', (data) => {
+    if (!data.vvState) return;
+    state = {
+      ...state,
+      ...data.vvState,
+      intensities: { ...DEFAULT_INTENSITIES, ...(data.vvState.intensities ?? {}) },
+    };
+    applyAll();
+  });
+
+  // Pick up state changes made from other tabs.
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes.vvState) return;
+    const newState = changes.vvState.newValue;
+    if (!newState || JSON.stringify(newState) === JSON.stringify(state)) return;
+    state = {
+      ...newState,
+      intensities: { ...DEFAULT_INTENSITIES, ...(newState.intensities ?? {}) },
+    };
+    applyAll();
+  });
 
   // SpeechRecognition runs here (page origin) instead of the popup — chrome-extension://
   // popup origins can't hold a mic permission grant, but the page origin can (same as
@@ -295,10 +331,33 @@
           zoom: cmd.zoom ?? state.zoom,
           intensities: cmd.intensities ? { ...state.intensities, ...cmd.intensities } : state.intensities,
         };
-        applyFilters();
-        applyZoom(state.zoom, state.intensities.zoom);
-        applyHemianopia(state.hemianopia);
+        applyAll();
       }
+      persistState();
+      sendResponse(state);
+      return;
+    }
+    // Turn a single active filter off (the × button in the popup).
+    if (message.type === 'TOGGLE_FILTER') {
+      const key = message.key;
+      if (key === 'colorMode' || key === 'zoom' || key === 'hemianopia' || key === 'brightness') {
+        state = { ...state, [key]: null };
+      } else {
+        state = { ...state, [key]: false };
+      }
+      applyAll();
+      persistState();
+      sendResponse(state);
+      return;
+    }
+    // Adjust a filter's intensity slider in the popup.
+    if (message.type === 'SET_INTENSITY') {
+      const { key, value } = message;
+      state = key === 'brightness'
+        ? { ...state, brightness: value }
+        : { ...state, intensities: { ...state.intensities, [key]: value } };
+      applyAll();
+      persistState();
       sendResponse(state);
       return;
     }

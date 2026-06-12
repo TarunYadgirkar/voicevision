@@ -3,7 +3,7 @@
   "name": "VoiceVision",
   "version": "1.2.0",
   "description": "Voice-activated screen accessibility. Speak your needs — the page adapts in real time.",
-  "permissions": ["activeTab"],
+  "permissions": ["activeTab", "storage"],
   "action": {
     "default_popup": "popup.html",
     "default_title": "VoiceVision — speak to adapt this page"

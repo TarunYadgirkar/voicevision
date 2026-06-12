@@ -60,14 +60,42 @@
     color: #9ca3af;
     min-height: 16px;
   }
-  .badges { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
-  .badge {
-    background: #3b82f6;
-    color: #fff;
-    border-radius: 999px;
-    padding: 4px 10px;
-    font-size: 12px;
+  .filters { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #1f2937;
+    border-radius: 10px;
+    padding: 8px 10px;
   }
+  .filter-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #f0f0f0;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .filter-slider {
+    flex: 1 1 auto;
+    min-width: 0;
+    accent-color: #3b82f6;
+    height: 4px;
+    cursor: pointer;
+  }
+  .filter-remove {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: 999px;
+    background: #374151;
+    color: #d1d5db;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .filter-remove:hover { background: #ef4444; color: #fff; }
   .empty { color: #6b7280; font-size: 12px; }
   .hint { margin-top: 14px; font-size: 11px; color: #6b7280; line-height: 1.5; }
 </style>
@@ -80,7 +108,7 @@
   <button id="micBtn">🎤 Hold to Speak</button>
   <p id="transcript"></p>
   <p id="explanation"></p>
-  <div id="badges" class="badges"><span class="empty">No filters active</span></div>
+  <div id="filters" class="filters"><span class="empty">No filters active</span></div>
   <p class="hint">Try: "I have red-green colorblindness", "make it dark", "I'm light sensitive", "reset to normal"</p>
   <script src="popup.js"></script>
 </body>

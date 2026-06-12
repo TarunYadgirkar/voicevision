@@ -5,7 +5,7 @@ const micBtn = document.getElementById('micBtn');
 const openSiteBtn = document.getElementById('openSiteBtn');
 const transcriptEl = document.getElementById('transcript');
 const explanationEl = document.getElementById('explanation');
-const badgesEl = document.getElementById('badges');
+const filtersEl = document.getElementById('filters');
 
 const MODE_LABELS = {
   deuteranopia: 'Deuteranopia',
@@ -28,24 +28,70 @@ const HEMIANOPIA_LABELS = {
 let lastState = null;
 let activePort = null;
 
+// Each entry: key = state field cleared by ×, intensityKey = state.intensities field (or
+// 'brightness' for the direct-value brightness filter), null = no slider.
+function getActiveFilters(state) {
+  const items = [];
+  if (state.colorMode) {
+    items.push({ key: 'colorMode', label: MODE_LABELS[state.colorMode] ?? state.colorMode, intensityKey: 'colorMode' });
+  }
+  if (state.darkMode) items.push({ key: 'darkMode', label: 'Dark Mode', intensityKey: 'darkMode' });
+  if (state.highContrast) items.push({ key: 'highContrast', label: 'High Contrast', intensityKey: 'highContrast' });
+  if (state.warmTone) items.push({ key: 'warmTone', label: 'Warm Tone', intensityKey: 'warmTone' });
+  if (state.invertColors && !state.darkMode) items.push({ key: 'invertColors', label: 'Inverted', intensityKey: 'invertColors' });
+  if (state.blur) items.push({ key: 'blur', label: 'Cataracts (Clarity Boost)', intensityKey: 'blur' });
+  if (state.brightness !== null && state.brightness !== undefined) {
+    items.push({ key: 'brightness', label: 'Brightness', intensityKey: 'brightness', min: 0.1, max: 1.5, step: 0.05 });
+  }
+  if (state.zoom) items.push({ key: 'zoom', label: ZOOM_LABELS[state.zoom] ?? state.zoom, intensityKey: 'zoom' });
+  if (state.hemianopia) items.push({ key: 'hemianopia', label: HEMIANOPIA_LABELS[state.hemianopia] ?? state.hemianopia, intensityKey: null });
+  return items;
+}
+
 function renderBadges(state) {
   if (!state) return;
   lastState = state;
-  const active = [];
-  if (state.colorMode) active.push(MODE_LABELS[state.colorMode] ?? state.colorMode);
-  if (state.darkMode) active.push('Dark Mode');
-  if (state.highContrast) active.push('High Contrast');
-  if (state.warmTone) active.push('Warm Tone');
-  if (state.invertColors) active.push('Inverted');
-  if (state.blur) active.push('Cataracts (Clarity Boost)');
-  if (state.brightness !== null && state.brightness !== undefined) active.push(`Brightness ${state.brightness}`);
-  if (state.zoom) active.push(ZOOM_LABELS[state.zoom] ?? state.zoom);
-  if (state.hemianopia) active.push(HEMIANOPIA_LABELS[state.hemianopia] ?? state.hemianopia);
+  const items = getActiveFilters(state);
 
-  badgesEl.innerHTML = active.length
-    ? active.map((label) => `<span class="badge">${label}</span>`).join('')
-    : '<span class="empty">No filters active</span>';
+  if (!items.length) {
+    filtersEl.innerHTML = '<span class="empty">No filters active</span>';
+    return;
+  }
+
+  filtersEl.innerHTML = items.map((item) => {
+    let slider = '';
+    if (item.intensityKey === 'brightness') {
+      slider = `<input type="range" class="filter-slider" data-intensity-key="brightness"
+        min="${item.min}" max="${item.max}" step="${item.step}" value="${state.brightness}">`;
+    } else if (item.intensityKey) {
+      const value = state.intensities?.[item.intensityKey] ?? 1;
+      slider = `<input type="range" class="filter-slider" data-intensity-key="${item.intensityKey}"
+        min="0" max="1" step="0.05" value="${value}">`;
+    }
+    return `<div class="filter-row" data-key="${item.key}">
+      <span class="filter-label">${item.label}</span>
+      ${slider}
+      <button class="filter-remove" data-key="${item.key}" title="Turn off">×</button>
+    </div>`;
+  }).join('');
 }
+
+filtersEl.addEventListener('change', async (e) => {
+  const target = e.target;
+  if (!target.matches('.filter-slider')) return;
+  const key = target.dataset.intensityKey;
+  const value = parseFloat(target.value);
+  const state = await sendToActiveTab({ type: 'SET_INTENSITY', key, value });
+  renderBadges(state);
+});
+
+filtersEl.addEventListener('click', async (e) => {
+  const target = e.target;
+  if (!target.matches('.filter-remove')) return;
+  const key = target.dataset.key;
+  const state = await sendToActiveTab({ type: 'TOGGLE_FILTER', key });
+  renderBadges(state);
+});
 
 async function sendToActiveTab(message) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
