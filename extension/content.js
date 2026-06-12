@@ -238,6 +238,41 @@
     applyHemianopia(null);
   }
 
+  // SpeechRecognition runs here (page origin) instead of the popup — chrome-extension://
+  // popup origins can't hold a mic permission grant, but the page origin can (same as
+  // the standalone website). Streamed to the popup over a port since recognition is async.
+  chrome.runtime.onConnect.addListener((port) => {
+    if (port.name !== 'voicevision-mic') return;
+    let recognition = null;
+
+    port.onMessage.addListener((msg) => {
+      if (msg.type === 'STOP') {
+        recognition?.stop();
+        return;
+      }
+      if (msg.type !== 'START') return;
+
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        port.postMessage({ type: 'error', error: 'unsupported' });
+        return;
+      }
+
+      recognition = new SR();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      recognition.maxAlternatives = 1;
+      recognition.onstart = () => port.postMessage({ type: 'start' });
+      recognition.onend = () => port.postMessage({ type: 'end' });
+      recognition.onerror = (e) => port.postMessage({ type: 'error', error: e.error });
+      recognition.onresult = (e) => port.postMessage({ type: 'result', transcript: e.results[0][0].transcript });
+      recognition.start();
+    });
+
+    port.onDisconnect.addListener(() => recognition?.stop());
+  });
+
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.type === 'GET_STATE') {
       sendResponse(state);

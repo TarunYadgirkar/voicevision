@@ -1,6 +1,8 @@
 const API_URL = 'https://voicevision-eight.vercel.app/api/interpret';
+const SITE_URL = 'https://voicevision-eight.vercel.app';
 
 const micBtn = document.getElementById('micBtn');
+const openSiteBtn = document.getElementById('openSiteBtn');
 const transcriptEl = document.getElementById('transcript');
 const explanationEl = document.getElementById('explanation');
 const badgesEl = document.getElementById('badges');
@@ -24,6 +26,7 @@ const HEMIANOPIA_LABELS = {
 };
 
 let lastState = null;
+let activePort = null;
 
 function renderBadges(state) {
   if (!state) return;
@@ -54,60 +57,103 @@ async function sendToActiveTab(message) {
   }
 }
 
-function startListening() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    transcriptEl.textContent = 'Voice not supported — open this popup in Chrome or Edge.';
+async function handleTranscript(text) {
+  transcriptEl.textContent = `“${text}”`;
+  explanationEl.textContent = 'Thinking…';
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript: text, currentState: lastState }),
+    });
+    const command = await res.json();
+    if (command.error) {
+      explanationEl.textContent = command.error;
+      return;
+    }
+    explanationEl.textContent = command.explanation ?? '';
+    const state = await sendToActiveTab({ type: 'APPLY_COMMAND', command });
+    renderBadges(state);
+  } catch {
+    explanationEl.textContent = 'Could not reach VoiceVision API — check your connection.';
+  }
+}
+
+// Recognition runs in the content script (page origin) — chrome-extension:// popup
+// origins can't hold a mic permission grant. Streamed back over a port.
+async function startListening() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    transcriptEl.textContent = 'No active tab — open a regular webpage to use voice commands.';
     return;
   }
 
-  const recognition = new SR();
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  recognition.lang = 'en-US';
-  recognition.maxAlternatives = 1;
+  let port;
+  try {
+    port = chrome.tabs.connect(tab.id, { name: 'voicevision-mic' });
+  } catch {
+    transcriptEl.textContent = 'Open a regular webpage to use voice commands.';
+    return;
+  }
 
-  recognition.onstart = () => {
-    micBtn.classList.add('listening');
-    micBtn.textContent = '🎤 Listening…';
-  };
-  recognition.onend = () => {
+  activePort = port;
+
+  port.onDisconnect.addListener(() => {
+    activePort = null;
     micBtn.classList.remove('listening');
     micBtn.textContent = '🎤 Hold to Speak';
-  };
-  recognition.onerror = (e) => {
-    micBtn.classList.remove('listening');
-    micBtn.textContent = '🎤 Hold to Speak';
-    transcriptEl.textContent = `Mic error: ${e.error}. Click the lock icon → Site settings → allow microphone for this extension.`;
-  };
-  recognition.onresult = async (e) => {
-    const text = e.results[0][0].transcript;
-    transcriptEl.textContent = `“${text}”`;
-    explanationEl.textContent = 'Thinking…';
+    if (chrome.runtime.lastError) {
+      transcriptEl.textContent = 'Open a regular webpage (not a chrome:// page) to use voice commands.';
+    }
+  });
 
-    try {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: text, currentState: lastState }),
-      });
-      const command = await res.json();
-      if (command.error) {
-        explanationEl.textContent = command.error;
+  port.onMessage.addListener((msg) => {
+    if (msg.type === 'start') {
+      micBtn.classList.add('listening');
+      micBtn.textContent = '🎤 Listening…';
+      return;
+    }
+    if (msg.type === 'end') {
+      activePort = null;
+      micBtn.classList.remove('listening');
+      micBtn.textContent = '🎤 Hold to Speak';
+      return;
+    }
+    if (msg.type === 'result') {
+      handleTranscript(msg.transcript);
+      return;
+    }
+    if (msg.type === 'error') {
+      micBtn.classList.remove('listening');
+      micBtn.textContent = '🎤 Hold to Speak';
+      if (msg.error === 'unsupported') {
+        transcriptEl.textContent = 'Voice not supported on this page — try Chrome on a regular https:// site.';
         return;
       }
-      explanationEl.textContent = command.explanation ?? '';
-      const state = await sendToActiveTab({ type: 'APPLY_COMMAND', command });
-      renderBadges(state);
-    } catch {
-      explanationEl.textContent = 'Could not reach VoiceVision API — check your connection.';
+      if (msg.error === 'not-allowed' || msg.error === 'service-not-allowed') {
+        transcriptEl.textContent = 'Microphone access denied. Click the lock icon in the address bar of this tab → Site settings → allow Microphone, then try again.';
+        return;
+      }
+      transcriptEl.textContent = `Mic error: ${msg.error}`;
     }
-  };
+  });
 
-  recognition.start();
+  port.postMessage({ type: 'START' });
 }
 
-micBtn.addEventListener('click', startListening);
+micBtn.addEventListener('click', () => {
+  if (activePort) {
+    activePort.postMessage({ type: 'STOP' });
+    activePort.disconnect();
+    activePort = null;
+    micBtn.classList.remove('listening');
+    micBtn.textContent = '🎤 Hold to Speak';
+    return;
+  }
+  startListening();
+});
+openSiteBtn.addEventListener('click', () => chrome.tabs.create({ url: SITE_URL }));
 
 // Reflect whatever filters are already active on this tab when the popup opens
 sendToActiveTab({ type: 'GET_STATE' }).then(renderBadges);

@@ -5,6 +5,7 @@ interface UseSpeechRecognitionReturn {
   transcript: string;
   listening: boolean;
   startListening: () => void;
+  stopListening: () => void;
   supported: boolean;
 }
 
@@ -48,5 +49,9 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     recognition.start();
   }, []);
 
-  return { transcript, listening, startListening, supported };
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+  }, []);
+
+  return { transcript, listening, startListening, stopListening, supported };
 }

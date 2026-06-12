@@ -10,7 +10,7 @@ interface Props {
 }
 
 export function VoiceButton({ onCommand, onTranscript, currentState }: Props) {
-  const { transcript, listening, startListening, supported } = useSpeechRecognition();
+  const { transcript, listening, startListening, stopListening, supported } = useSpeechRecognition();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const currentStateRef = useRef(currentState);
@@ -61,8 +61,8 @@ export function VoiceButton({ onCommand, onTranscript, currentState }: Props) {
   return (
     <div className="flex flex-col items-center gap-3">
       <button
-        onClick={startListening}
-        disabled={listening || loading}
+        onClick={listening ? stopListening : startListening}
+        disabled={loading}
         className="relative group"
       >
         {listening && (
