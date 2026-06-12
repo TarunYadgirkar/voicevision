@@ -1,3 +1,23 @@
+export interface FilterIntensities {
+  colorMode: number; // 0-1, severity of the color-blindness simulation
+  darkMode: number; // 0-1
+  highContrast: number; // 0-1
+  warmTone: number; // 0-1
+  invertColors: number; // 0-1
+  blur: number; // 0-1, cataract / low-vision blur
+  zoom: number; // 0-1, magnitude for whichever zoom mode is active
+}
+
+export const defaultIntensities: FilterIntensities = {
+  colorMode: 1,
+  darkMode: 1,
+  highContrast: 1,
+  warmTone: 1,
+  invertColors: 1,
+  blur: 0.5,
+  zoom: 0.5,
+};
+
 export interface AccessibilityCommand {
   colorMode: 'deuteranopia' | 'protanopia' | 'tritanopia' | 'achromatopsia' | null;
   darkMode: boolean | null;
@@ -5,7 +25,10 @@ export interface AccessibilityCommand {
   brightness: number | null;
   warmTone: boolean | null;
   invertColors: boolean | null;
+  blur: boolean | null;
+  hemianopia: 'left' | 'right' | null;
   zoom: 'center' | 'peripheral' | 'full' | null;
+  intensities: Partial<FilterIntensities> | null;
   reset: boolean;
   explanation: string;
 }
@@ -17,7 +40,10 @@ export interface FilterState {
   brightness: number | null;
   warmTone: boolean;
   invertColors: boolean;
+  blur: boolean;
+  hemianopia: 'left' | 'right' | null;
   zoom: AccessibilityCommand['zoom'];
+  intensities: FilterIntensities;
 }
 
 export const defaultFilterState: FilterState = {
@@ -27,5 +53,8 @@ export const defaultFilterState: FilterState = {
   brightness: null,
   warmTone: false,
   invertColors: false,
+  blur: false,
+  hemianopia: null,
   zoom: null,
+  intensities: defaultIntensities,
 };

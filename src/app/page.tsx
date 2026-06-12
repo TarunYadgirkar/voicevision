@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { VoiceButton } from '@/components/VoiceButton';
 import { ActiveModes } from '@/components/ActiveModes';
 import { applyFilters, resetFilters } from '@/lib/filters';
-import { AccessibilityCommand, FilterState, defaultFilterState } from '@/types';
+import { AccessibilityCommand, FilterIntensities, FilterState, defaultFilterState } from '@/types';
 
 const SUPPORTED_ADAPTATIONS = [
   { category: 'Color Vision', items: [
@@ -16,6 +16,9 @@ const SUPPORTED_ADAPTATIONS = [
     { label: 'Macular Degeneration', desc: 'Central vision loss', key: 'zoom', value: 'center' },
     { label: 'Tunnel Vision', desc: 'Peripheral vision loss', key: 'zoom', value: 'peripheral' },
     { label: 'Low Vision', desc: 'Full page magnification', key: 'zoom', value: 'full' },
+    { label: 'Cataracts', desc: 'Blurred vision', key: 'blur', value: true },
+    { label: 'Hemianopia (Left)', desc: 'Left visual field loss', key: 'hemianopia', value: 'left' },
+    { label: 'Hemianopia (Right)', desc: 'Right visual field loss', key: 'hemianopia', value: 'right' },
   ]},
   { category: 'Display Comfort', items: [
     { label: 'Dark Mode', desc: 'Dark background for comfort', key: 'darkMode', value: true },
@@ -54,7 +57,10 @@ export default function Home() {
         brightness: merge(cmd.brightness, prev.brightness),
         warmTone: merge(cmd.warmTone, prev.warmTone),
         invertColors: merge(cmd.invertColors, prev.invertColors),
+        blur: merge(cmd.blur, prev.blur),
+        hemianopia: merge(cmd.hemianopia, prev.hemianopia),
         zoom: merge(cmd.zoom, prev.zoom),
+        intensities: cmd.intensities ? { ...prev.intensities, ...cmd.intensities } : prev.intensities,
       };
       applyFilters(next);
       return next;
@@ -71,6 +77,16 @@ export default function Home() {
       else if (key === 'invertColors') next.invertColors = false;
       else if (key === 'brightness') next.brightness = null;
       else if (key === 'zoom') next.zoom = null;
+      else if (key === 'blur') next.blur = false;
+      else if (key === 'hemianopia') next.hemianopia = null;
+      applyFilters(next);
+      return next;
+    });
+  };
+
+  const handleIntensityChange = (key: keyof FilterIntensities, value: number) => {
+    setFilterState(prev => {
+      const next: FilterState = { ...prev, intensities: { ...prev.intensities, [key]: value } };
       applyFilters(next);
       return next;
     });
@@ -82,12 +98,13 @@ export default function Home() {
     setExplanation('All filters cleared.');
   };
 
-  type ToggleableKey = Exclude<keyof FilterState, 'brightness'>;
+  type ToggleableKey = Exclude<keyof FilterState, 'brightness' | 'intensities'>;
   type ToggleableValue = string | boolean;
 
   const isActive = (key: ToggleableKey, value: ToggleableValue): boolean => {
     if (key === 'colorMode') return filterState.colorMode === value;
     if (key === 'zoom') return filterState.zoom === value;
+    if (key === 'hemianopia') return filterState.hemianopia === value;
     return filterState[key] === value;
   };
 
@@ -96,10 +113,12 @@ export default function Home() {
       const next = { ...prev };
       if (key === 'colorMode') next.colorMode = (prev.colorMode === value ? null : value) as FilterState['colorMode'];
       else if (key === 'zoom') next.zoom = (prev.zoom === value ? null : value) as FilterState['zoom'];
+      else if (key === 'hemianopia') next.hemianopia = (prev.hemianopia === value ? null : value) as FilterState['hemianopia'];
       else if (key === 'darkMode') next.darkMode = !prev.darkMode;
       else if (key === 'highContrast') next.highContrast = !prev.highContrast;
       else if (key === 'warmTone') next.warmTone = !prev.warmTone;
       else if (key === 'invertColors') next.invertColors = !prev.invertColors;
+      else if (key === 'blur') next.blur = !prev.blur;
       applyFilters(next);
       return next;
     });
@@ -134,7 +153,7 @@ export default function Home() {
           <div className="flex-1 max-w-lg mx-auto lg:mx-0 w-full">
             <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-[0_8px_40px_-12px_rgba(0,0,0,0.12)] border border-white/60 p-8 space-y-6">
               <div className="flex justify-center">
-                <VoiceButton onCommand={handleCommand} onTranscript={setLastTranscript} />
+                <VoiceButton onCommand={handleCommand} onTranscript={setLastTranscript} currentState={filterState} />
               </div>
 
               {(lastTranscript || explanation) && (
@@ -159,7 +178,7 @@ export default function Home() {
               )}
 
               <div className="pt-2 border-t border-gray-100">
-                <ActiveModes state={filterState} onRemove={handleRemove} onReset={handleReset} />
+                <ActiveModes state={filterState} onRemove={handleRemove} onReset={handleReset} onIntensityChange={handleIntensityChange} />
               </div>
             </div>
 

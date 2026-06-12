@@ -1,17 +1,20 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
-import { AccessibilityCommand } from '@/types';
+import { AccessibilityCommand, FilterState } from '@/types';
 
 interface Props {
   onCommand: (cmd: AccessibilityCommand) => void;
   onTranscript: (text: string) => void;
+  currentState: FilterState;
 }
 
-export function VoiceButton({ onCommand, onTranscript }: Props) {
+export function VoiceButton({ onCommand, onTranscript, currentState }: Props) {
   const { transcript, listening, startListening, supported } = useSpeechRecognition();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const currentStateRef = useRef(currentState);
+  currentStateRef.current = currentState;
 
   useEffect(() => {
     if (!transcript) return;
@@ -22,7 +25,7 @@ export function VoiceButton({ onCommand, onTranscript }: Props) {
     fetch('/api/interpret', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transcript }),
+      body: JSON.stringify({ transcript, currentState: currentStateRef.current }),
     })
       .then(r => {
         if (!r.ok) return r.json().then(body => { throw { status: r.status, message: body?.error }; });

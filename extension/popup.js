@@ -18,16 +18,26 @@ const ZOOM_LABELS = {
   full: 'Magnified',
 };
 
+const HEMIANOPIA_LABELS = {
+  left: 'Hemianopia (Left)',
+  right: 'Hemianopia (Right)',
+};
+
+let lastState = null;
+
 function renderBadges(state) {
   if (!state) return;
+  lastState = state;
   const active = [];
   if (state.colorMode) active.push(MODE_LABELS[state.colorMode] ?? state.colorMode);
   if (state.darkMode) active.push('Dark Mode');
   if (state.highContrast) active.push('High Contrast');
   if (state.warmTone) active.push('Warm Tone');
   if (state.invertColors) active.push('Inverted');
+  if (state.blur) active.push('Cataracts / Blur');
   if (state.brightness !== null && state.brightness !== undefined) active.push(`Brightness ${state.brightness}`);
   if (state.zoom) active.push(ZOOM_LABELS[state.zoom] ?? state.zoom);
+  if (state.hemianopia) active.push(HEMIANOPIA_LABELS[state.hemianopia] ?? state.hemianopia);
 
   badgesEl.innerHTML = active.length
     ? active.map((label) => `<span class="badge">${label}</span>`).join('')
@@ -79,7 +89,7 @@ function startListening() {
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: text }),
+        body: JSON.stringify({ transcript: text, currentState: lastState }),
       });
       const command = await res.json();
       if (command.error) {
