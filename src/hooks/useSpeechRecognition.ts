@@ -1,8 +1,7 @@
 'use client';
-import { useState, useRef, useCallback, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 interface UseSpeechRecognitionReturn {
-  transcript: string;
   listening: boolean;
   startListening: () => void;
   stopListening: () => void;
@@ -14,22 +13,29 @@ type SpeechRecognitionWindow = typeof window & {
 };
 
 const noopSubscribe = () => () => {};
-const getSupportSnapshot = () =>
-  'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+const getSupportSnapshot = () => 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
 const getServerSupportSnapshot = () => false;
 
-export function useSpeechRecognition(): UseSpeechRecognitionReturn {
-  const [transcript, setTranscript] = useState('');
+// The result arrives as a callback rather than a `transcript` value. Saying the same
+// phrase twice used to do nothing, because the second result set state to a string that
+// was already there and the effect watching it never re-ran.
+export function useSpeechRecognition(onResult: (text: string) => void): UseSpeechRecognitionReturn {
   const [listening, setListening] = useState(false);
   const supported = useSyncExternalStore(noopSubscribe, getSupportSnapshot, getServerSupportSnapshot);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const onResultRef = useRef(onResult);
+
+  useEffect(() => {
+    onResultRef.current = onResult;
+  });
+
+  useEffect(() => () => recognitionRef.current?.abort(), []);
 
   const startListening = useCallback(() => {
-    if (typeof window === 'undefined') return;
     const SR = window.SpeechRecognition || (window as SpeechRecognitionWindow).webkitSpeechRecognition;
     if (!SR) return;
 
-    if (recognitionRef.current) recognitionRef.current.abort();
+    recognitionRef.current?.abort();
 
     const recognition = new SR() as SpeechRecognition;
     recognition.continuous = false;
@@ -40,10 +46,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     recognition.onstart = () => setListening(true);
     recognition.onend = () => setListening(false);
     recognition.onerror = () => setListening(false);
-    recognition.onresult = (e: SpeechRecognitionEvent) => {
-      const text = e.results[0][0].transcript;
-      setTranscript(text);
-    };
+    recognition.onresult = (e: SpeechRecognitionEvent) => onResultRef.current(e.results[0][0].transcript);
 
     recognitionRef.current = recognition;
     recognition.start();
@@ -53,5 +56,5 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     recognitionRef.current?.stop();
   }, []);
 
-  return { transcript, listening, startListening, stopListening, supported };
+  return { listening, startListening, stopListening, supported };
 }
