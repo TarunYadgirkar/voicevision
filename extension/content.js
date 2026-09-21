@@ -339,17 +339,17 @@
   var CORRECT_RE = /\b(help me see colors?|correct (my |the )?colors?|fix (my |the )?colors?|i am color ?blind|i'm color ?blind|i have color ?blindness)\b/;
   var CONDITION_RULES = [
     {
-      test: /\b(red[- ]green color ?blind(ness)?|deuteranopia|deuteranomaly|can'?t tell red from green|confuse red and green|red and green (look the same|blend))\b/,
+      test: /\b(red[- ]green color ?blind(ness)?|deuteranopia|deuteranomaly|deuteranope|can'?t tell red from green|confuse red and green|red and green (look the same|blend))\b/,
       label: "deuteranopia",
       patch: { colorMode: "deuteranopia" }
     },
     {
-      test: /\b(protanopia|protanomaly|red weakness|reds? looks? dark)\b/,
+      test: /\b(protanopia|protanomaly|protanope|red weakness|reds? looks? dark)\b/,
       label: "protanopia",
       patch: { colorMode: "protanopia" }
     },
     {
-      test: /\b(blue[- ]yellow color ?blind(ness)?|tritanopia|tritanomaly)\b/,
+      test: /\b(blue[- ]yellow color ?blind(ness)?|tritanopia|tritanomaly|tritanope)\b/,
       label: "tritanopia",
       patch: { colorMode: "tritanopia" }
     },
