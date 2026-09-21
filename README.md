@@ -79,18 +79,42 @@ Commands stack. Say "dark mode" then "high contrast" and both apply.
 
 ## Chrome Extension (use on any site)
 
-The `extension/` folder is a Manifest V3 extension that applies the same voice-controlled
-filters to any webpage, not just the VoiceVision demo site.
+The `extension/` folder is a Manifest V3 extension that applies the same adaptations to any
+webpage, not just the VoiceVision demo site.
 
 1. Open `chrome://extensions`
 2. Enable **Developer mode** (top right)
-3. Click **Load unpacked** → select the `extension/` folder
-4. Pin the VoiceVision icon, open it on any site, click the mic and speak a command
+3. Click **Load unpacked** -> select the `extension/` folder
+4. Pin the VoiceVision icon, open it on any site, and either press the mic or use the controls
 
-The popup calls the same `/api/interpret` endpoint as the web app and forwards the
-returned command to a content script injected into the active page, which applies
-color-blindness filters, dark mode, contrast/brightness/warmth, invert, and the
-center/peripheral/full zoom overlays directly to that page.
+**Voice is not the only way in.** The popup carries a labelled button for every adaptation
+(dark mode, high contrast, warm tone, invert, bold text, reduce motion, dim screen, each color
+vision mode, each magnifier, and left/right field loss), sliders for the strength of whatever is
+on, a choice between correcting colors for you and previewing a deficiency, and a choice between
+applying settings to this site or to all sites.
+
+**Alt+Shift+V** opens the popup from anywhere. Rebind it at `chrome://extensions/shortcuts`.
+
+Spoken commands are interpreted on the device first by the content script's own parser. Only when
+that parser cannot place a phrase does the popup call `/api/interpret`, and then it sends just the
+transcript and the currently active adaptations. `extension/PRIVACY.md` has the full account.
+
+---
+
+## Security
+
+- **CORS allowlist.** `/api/interpret` answers with `Access-Control-Allow-Origin` only for the
+  request's own origin, any `chrome-extension://` origin, and `http://localhost` (or `127.0.0.1`)
+  for local development. Every other origin gets no allow header, so the browser blocks the read.
+  Responses carry `Vary: Origin`.
+- **Input caps.** `transcript` must be a non-empty string of 300 characters or fewer; anything
+  else is a 400.
+- **Rate limit.** 20 requests per minute per IP in a sliding window, answered with 429 and a
+  `Retry-After` header. The counter lives in memory, so on serverless it is per-instance. It is a
+  guard on the Gemini free-tier quota, not a security boundary.
+- **Key handling.** The Gemini client is built inside the request handler. With `GEMINI_API_KEY`
+  unset the route returns 503 with a clear message instead of failing at import time. The key
+  never reaches the client.
 
 ---
 
