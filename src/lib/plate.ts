@@ -90,6 +90,8 @@ interface PlateOptions {
   seed?: number;
   count?: number;
   tierCount?: number;
+  /** Multiplies every dot radius, for the coarse plate used as the logo mark. */
+  radiusScale?: number;
 }
 
 const RADII = [0.0132, 0.0168, 0.0208, 0.0252, 0.0305];
@@ -102,14 +104,14 @@ const RADIUS_EASE = 1;
 // dot already placed. Same seed always yields the same plate, so the hero and the two
 // proof panes show one identical plate and only the filter differs between them.
 export function generatePlate(options: PlateOptions = {}): PlateDot[] {
-  const { glyph: glyphName = '7', seed = 20260921, count = 600, tierCount = 3 } = options;
+  const { glyph: glyphName = '7', seed = 20260921, count = 600, tierCount = 3, radiusScale = 1 } = options;
   const glyph = GLYPHS[glyphName];
   const random = mulberry32(seed);
   const dots: PlateDot[] = [];
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS && dots.length < count; attempt++) {
     const progress = attempt / MAX_ATTEMPTS;
-    const radius = RADII[Math.min(RADII.length - 1, Math.floor(progress ** RADIUS_EASE * RADII.length))];
+    const radius = RADII[Math.min(RADII.length - 1, Math.floor(progress ** RADIUS_EASE * RADII.length))] * radiusScale;
     const angle = random() * Math.PI * 2;
     const distance = Math.sqrt(random()) * (0.5 - radius - 0.004);
     const x = 0.5 + Math.cos(angle) * distance;

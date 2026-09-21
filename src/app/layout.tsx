@@ -1,34 +1,40 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { FilterOverlay } from "@/components/FilterOverlay";
+import type { Metadata } from 'next';
+import { Bricolage_Grotesque, Public_Sans } from 'next/font/google';
+import './globals.css';
+import { FilterOverlay } from '@/components/FilterOverlay';
+import { BOOT_SCRIPT } from '@/lib/persistence';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// Public Sans is the US Web Design System text face, drawn against federal accessibility
+// requirements: open apertures, tall x-height, unambiguous 1/l/I and 0/O. It is the right
+// face for a product whose whole claim is that people can read the screen.
+const publicSans = Public_Sans({
+  variable: '--font-public-sans',
+  subsets: ['latin'],
+  display: 'swap',
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+// Bricolage Grotesque carries an optical-size and a width axis, so the display cut at
+// hero size is a genuinely different drawing rather than Public Sans set large.
+const bricolage = Bricolage_Grotesque({
+  variable: '--font-bricolage',
+  subsets: ['latin'],
+  display: 'swap',
+  axes: ['opsz', 'wdth'],
 });
 
 export const metadata: Metadata = {
-  title: "VoiceVision",
-  description: "Voice-activated accessibility layer",
+  title: 'VoiceVision',
+  description:
+    'Say how you see and the screen adapts. VoiceVision corrects colour vision, contrast, magnification and motion on the page you are reading.',
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
+    <html lang="en" className={`${publicSans.variable} ${bricolage.variable} h-full antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />
+      </head>
+      <body className="min-h-full flex flex-col bg-page text-text">
         <FilterOverlay />
         {children}
       </body>
