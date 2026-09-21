@@ -20,8 +20,11 @@ export const defaultIntensities: FilterIntensities = {
   dimOverlay: 0.5,
 };
 
+export type ColorAssist = 'simulate' | 'correct';
+
 export interface AccessibilityCommand {
   colorMode: 'deuteranopia' | 'protanopia' | 'tritanopia' | 'achromatopsia' | null;
+  colorAssist: ColorAssist | null;
   darkMode: boolean | null;
   highContrast: boolean | null;
   brightness: number | null;
@@ -40,6 +43,7 @@ export interface AccessibilityCommand {
 
 export interface FilterState {
   colorMode: AccessibilityCommand['colorMode'];
+  colorAssist: ColorAssist;
   darkMode: boolean;
   highContrast: boolean;
   brightness: number | null;
@@ -56,6 +60,7 @@ export interface FilterState {
 
 export const defaultFilterState: FilterState = {
   colorMode: null,
+  colorAssist: 'correct',
   darkMode: false,
   highContrast: false,
   brightness: null,
