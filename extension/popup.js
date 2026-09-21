@@ -228,10 +228,19 @@ async function interpretRemotely(text) {
   return res.json();
 }
 
+// Local first: the content script's own parser handles the common phrasings offline, and the
+// transcript only leaves the device when it replies { handled: false } or cannot answer at all.
 async function handleTranscript(rawText) {
   const text = rawText.slice(0, MAX_TRANSCRIPT_CHARS);
   transcriptEl.textContent = `“${text}”`;
   explanationEl.textContent = 'Working on it…';
+
+  const local = await sendToActiveTab({ type: 'vv:interpret', transcript: text });
+  if (local?.handled) {
+    explanationEl.textContent = 'Applied locally';
+    render(local.state);
+    return;
+  }
 
   try {
     const command = await interpretRemotely(text);
