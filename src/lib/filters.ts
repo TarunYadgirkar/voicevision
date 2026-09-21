@@ -192,7 +192,7 @@ export function applyDimOverlay(active: boolean, intensity: number): void {
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'vv-dim-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:999997;pointer-events:none;background:black;';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483645;pointer-events:none;background:black;';
     document.documentElement.appendChild(overlay);
   }
   overlay.style.opacity = (0.15 + intensity * 0.45).toFixed(2);
@@ -268,7 +268,7 @@ export function applyZoom(zoom: FilterState['zoom'], intensity: number): void {
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'vv-zoom-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:999999;pointer-events:none;';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;pointer-events:none;';
     document.documentElement.appendChild(overlay);
   }
 
@@ -317,7 +317,7 @@ export function applyHemianopia(side: FilterState['hemianopia']): void {
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'vv-hemianopia-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:999998;pointer-events:none;';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483646;pointer-events:none;';
     document.documentElement.appendChild(overlay);
   }
 

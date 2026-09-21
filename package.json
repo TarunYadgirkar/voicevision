@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build:ext": "esbuild src/extension/content.ts --bundle --format=iife --target=chrome110 --outfile=extension/content.js"
   },
   "dependencies": {
     "@google/genai": "^2.8.0",
@@ -16,9 +17,11 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/chrome": "^0.3.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
