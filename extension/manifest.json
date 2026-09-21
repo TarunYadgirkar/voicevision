@@ -1,12 +1,34 @@
 {
   "manifest_version": 3,
   "name": "VoiceVision",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Voice-activated screen accessibility. Speak your needs — the page adapts in real time.",
   "permissions": ["activeTab", "storage"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "VoiceVision — speak to adapt this page"
+    "default_title": "VoiceVision — speak to adapt this page",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "toggle-listening": {
+      "suggested_key": {
+        "default": "Alt+Shift+V",
+        "mac": "Alt+Shift+V"
+      },
+      "description": "Open VoiceVision and start listening"
+    }
   },
   "content_scripts": [
     {
