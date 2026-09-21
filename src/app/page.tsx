@@ -55,6 +55,7 @@ export default function Home() {
 
       const next: FilterState = {
         colorMode: merge(cmd.colorMode, prev.colorMode),
+        colorAssist: merge(cmd.colorAssist, prev.colorAssist),
         darkMode: merge(cmd.darkMode, prev.darkMode),
         highContrast: merge(cmd.highContrast, prev.highContrast),
         brightness: merge(cmd.brightness, prev.brightness),

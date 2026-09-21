@@ -341,3 +341,7 @@ Stack: Next.js + @google/genai (gemini-2.5-flash) + Web Speech API + SVG CSS fil
 Current status: [what's working]
 Next task: [what to build]
 ```
+
+## Cross-tool compatibility
+
+Also read `CLAUDE.md` for any project context not duplicated here. If the files conflict, this `AGENTS.md` takes precedence for Codex.
