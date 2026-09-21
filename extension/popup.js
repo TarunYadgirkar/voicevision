@@ -46,10 +46,10 @@ const CONTROL_GROUPS = [
     ],
   },
   {
-    title: 'Field loss after a stroke',
+    title: 'Field loss on one side',
     items: [
-      { key: 'hemianopia', value: 'left', label: 'Left side is missing' },
-      { key: 'hemianopia', value: 'right', label: 'Right side is missing' },
+      { key: 'hemianopia', value: 'left', label: 'Left side' },
+      { key: 'hemianopia', value: 'right', label: 'Right side' },
     ],
   },
 ];
@@ -58,8 +58,8 @@ const COLOR_ASSIST_SEGMENT = {
   title: 'What the color change is for',
   field: 'colorAssist',
   options: [
-    { value: 'correct', label: 'Correct colors for me' },
-    { value: 'simulate', label: 'Preview the deficiency' },
+    { value: 'correct', label: 'Correct colors' },
+    { value: 'simulate', label: 'Preview deficiency' },
   ],
 };
 
