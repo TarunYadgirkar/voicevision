@@ -109,29 +109,33 @@ export function updateColorMatrices(intensity: number, idPrefix = ''): void {
   }
 }
 
-export function buildFilterString(state: FilterState, idPrefix = ''): string {
+// No cone class survives in achromatopsia, so there is no hue axis to shift into.
+// In 'correct' mode the only useful help is luminance contrast; grayscale is a
+// simulation of the condition and belongs only in 'simulate'.
+function colorPart(state: FilterState, idPrefix: string): string | null {
+  const intensity = state.intensities.colorMode;
+
+  if (state.colorMode === 'achromatopsia') {
+    return state.colorAssist === 'simulate'
+      ? `grayscale(${Math.round(intensity * 100)}%)`
+      : `contrast(${Math.round(100 + 60 * intensity)}%)`;
+  }
+  if (!state.colorMode) return null;
+  return `url(#${idPrefix}${state.colorMode}-${state.colorAssist})`;
+}
+
+// Dark mode already inverts, so an explicit invert on top would cancel it out.
+function invertParts(state: FilterState): string[] {
+  const { intensities } = state;
+  if (state.darkMode) return [`invert(${Math.round(93 * intensities.darkMode)}%) hue-rotate(180deg)`];
+  if (state.invertColors) return [`invert(${Math.round(100 * intensities.invertColors)}%) hue-rotate(180deg)`];
+  return [];
+}
+
+function toneParts(state: FilterState): string[] {
   const { intensities } = state;
   const parts: string[] = [];
 
-  if (state.colorMode === 'achromatopsia') {
-    // No cone class survives in achromatopsia, so there is no hue axis to shift into.
-    // In 'correct' mode the only useful help is luminance contrast; grayscale is a
-    // simulation of the condition and belongs only in 'simulate'.
-    if (state.colorAssist === 'simulate') {
-      parts.push(`grayscale(${Math.round(intensities.colorMode * 100)}%)`);
-    } else {
-      parts.push(`contrast(${Math.round(100 + 60 * intensities.colorMode)}%)`);
-    }
-  } else if (state.colorMode) {
-    parts.push(`url(#${idPrefix}${state.colorMode}-${state.colorAssist})`);
-  }
-
-  if (state.darkMode) {
-    parts.push(`invert(${Math.round(93 * intensities.darkMode)}%) hue-rotate(180deg)`);
-  }
-  if (state.invertColors && !state.darkMode) {
-    parts.push(`invert(${Math.round(100 * intensities.invertColors)}%) hue-rotate(180deg)`);
-  }
   if (state.warmTone) parts.push(`sepia(${Math.round(25 * intensities.warmTone)}%)`);
   if (state.highContrast) parts.push(`contrast(${Math.round(100 + 50 * intensities.highContrast)}%)`);
   // Cataracts/low vision: the page is already hazy to the user, so we boost contrast
@@ -140,10 +144,22 @@ export function buildFilterString(state: FilterState, idPrefix = ''): string {
     parts.push(`contrast(${Math.round(100 + 60 * intensities.blur)}%)`);
     parts.push(`brightness(${Math.round(100 + 15 * intensities.blur)}%)`);
   }
-  if (state.brightness !== null) parts.push(`brightness(${state.brightness})`);
-  if (state.darkMode && state.brightness === null) {
-    parts.push(`brightness(${(1 - 0.2 * intensities.darkMode).toFixed(2)})`);
-  }
+  return parts;
+}
+
+function brightnessParts(state: FilterState): string[] {
+  if (state.brightness !== null) return [`brightness(${state.brightness})`];
+  if (state.darkMode) return [`brightness(${(1 - 0.2 * state.intensities.darkMode).toFixed(2)})`];
+  return [];
+}
+
+export function buildFilterString(state: FilterState, idPrefix = ''): string {
+  const parts = [
+    colorPart(state, idPrefix),
+    ...invertParts(state),
+    ...toneParts(state),
+    ...brightnessParts(state),
+  ].filter((part): part is string => part !== null);
 
   return parts.join(' ') || 'none';
 }
