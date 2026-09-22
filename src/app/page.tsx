@@ -9,9 +9,9 @@ import { useCommandRunner } from '@/hooks/useCommandRunner';
 function Hero() {
   return (
     <section className="relative isolate pt-8 sm:pt-14">
-      {/* Hermeus framing: the plate crops over the tail of the headline, so the two read
+      {/* Hermeus framing: the headline runs over the plate, so the two read
           as one image instead of a picture parked beside a sentence. */}
-      <div className="pointer-events-none absolute -right-4 top-0 z-20 w-[42%] max-w-[23rem]">
+      <div className="pointer-events-none absolute -right-4 top-0 z-0 w-[42%] max-w-[23rem]">
         <IshiharaPlate
           type="deuteranopia"
           drift
