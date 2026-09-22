@@ -8,25 +8,25 @@ import { useCommandRunner } from '@/hooks/useCommandRunner';
 
 function Hero() {
   return (
-    <section className="relative isolate pt-10 sm:pt-16">
-      {/* The plate sits over the tail of the headline, the way the Hermeus engine crops
-          its own hero line. The type stays readable; the plate is what you look at. */}
-      <div className="pointer-events-none absolute right-0 top-0 z-20 w-56 sm:w-80 lg:w-[26rem]">
+    <section className="relative isolate pt-8 sm:pt-14">
+      {/* Hermeus framing: the plate crops over the tail of the headline, so the two read
+          as one image instead of a picture parked beside a sentence. */}
+      <div className="pointer-events-none absolute -right-4 top-0 z-20 w-[42%] max-w-[23rem]">
         <IshiharaPlate
           type="deuteranopia"
           drift
-          title="An Ishihara plate built from coloured dots, with the digit 7 readable through hue alone"
+          title="An Ishihara plate of coloured dots with the digit 7 picked out in a second hue"
         />
       </div>
 
-      <h1 className="type-display relative z-10 max-w-3xl text-5xl sm:text-7xl lg:text-8xl">
+      <h1 className="type-display relative z-10 max-w-[16ch] text-5xl sm:text-7xl lg:text-8xl">
         Say how you see and the screen changes.
       </h1>
 
-      <p className="type-body relative z-30 mt-6 text-lg text-muted sm:text-xl">
-        VoiceVision reads your words on this device and adapts colour, contrast, magnification and motion on
-        the page you are already reading. The plate above hides a 7 that only hue can tell you about, so it is
-        the first thing to change when you ask for help.
+      <p className="type-body relative z-10 mt-8 max-w-xl text-lg text-muted sm:text-xl">
+        VoiceVision reads your words on this device and adapts colour, contrast, magnification and motion on the
+        page you are already reading. The plate hides a 7 that separates from its background by hue alone, so a
+        red-green deficiency erases it.
       </p>
     </section>
   );
@@ -50,7 +50,7 @@ export default function Home() {
           Adapt this page
         </h2>
 
-        <div className="rounded-lg bg-raised p-5 sm:p-6">
+        <div className="min-w-0 rounded-lg bg-raised p-5 sm:p-6">
           <CommandBar
             onSubmit={runner.run}
             onReset={handleReset}
@@ -70,7 +70,7 @@ export default function Home() {
           </div>
         </div>
 
-        <aside className="rounded-lg bg-raised p-5 sm:p-6">
+        <aside className="min-w-0 rounded-lg bg-raised p-5 sm:p-6">
           <h3 className="type-heading text-xl">Things people say</h3>
           <ul className="mt-3 space-y-2 text-sm text-muted">
             {[
