@@ -80,34 +80,43 @@
       }
     }
   }
-  function buildFilterString(state, idPrefix = "") {
+  function colorPart(state, idPrefix) {
+    const intensity = state.intensities.colorMode;
+    if (state.colorMode === "achromatopsia") {
+      return state.colorAssist === "simulate" ? `grayscale(${Math.round(intensity * 100)}%)` : `contrast(${Math.round(100 + 60 * intensity)}%)`;
+    }
+    if (!state.colorMode) return null;
+    return `url(#${idPrefix}${state.colorMode}-${state.colorAssist})`;
+  }
+  function invertParts(state) {
+    const { intensities } = state;
+    if (state.darkMode) return [`invert(${Math.round(93 * intensities.darkMode)}%) hue-rotate(180deg)`];
+    if (state.invertColors) return [`invert(${Math.round(100 * intensities.invertColors)}%) hue-rotate(180deg)`];
+    return [];
+  }
+  function toneParts(state) {
     const { intensities } = state;
     const parts = [];
-    if (state.colorMode === "achromatopsia") {
-      if (state.colorAssist === "simulate") {
-        parts.push(`grayscale(${Math.round(intensities.colorMode * 100)}%)`);
-      } else {
-        parts.push(`contrast(${Math.round(100 + 60 * intensities.colorMode)}%)`);
-      }
-    } else if (state.colorMode) {
-      parts.push(`url(#${idPrefix}${state.colorMode}-${state.colorAssist})`);
-    }
-    if (state.darkMode) {
-      parts.push(`invert(${Math.round(93 * intensities.darkMode)}%) hue-rotate(180deg)`);
-    }
-    if (state.invertColors && !state.darkMode) {
-      parts.push(`invert(${Math.round(100 * intensities.invertColors)}%) hue-rotate(180deg)`);
-    }
     if (state.warmTone) parts.push(`sepia(${Math.round(25 * intensities.warmTone)}%)`);
     if (state.highContrast) parts.push(`contrast(${Math.round(100 + 50 * intensities.highContrast)}%)`);
     if (state.blur) {
       parts.push(`contrast(${Math.round(100 + 60 * intensities.blur)}%)`);
       parts.push(`brightness(${Math.round(100 + 15 * intensities.blur)}%)`);
     }
-    if (state.brightness !== null) parts.push(`brightness(${state.brightness})`);
-    if (state.darkMode && state.brightness === null) {
-      parts.push(`brightness(${(1 - 0.2 * intensities.darkMode).toFixed(2)})`);
-    }
+    return parts;
+  }
+  function brightnessParts(state) {
+    if (state.brightness !== null) return [`brightness(${state.brightness})`];
+    if (state.darkMode) return [`brightness(${(1 - 0.2 * state.intensities.darkMode).toFixed(2)})`];
+    return [];
+  }
+  function buildFilterString(state, idPrefix = "") {
+    const parts = [
+      colorPart(state, idPrefix),
+      ...invertParts(state),
+      ...toneParts(state),
+      ...brightnessParts(state)
+    ].filter((part) => part !== null);
     return parts.join(" ") || "none";
   }
   function applyDimOverlay(active, intensity) {
@@ -451,32 +460,40 @@
     if (CORRECT_RE.test(text)) return "correct";
     return null;
   }
-  function parseIntent(transcript, current) {
-    const text = normalize(transcript);
-    if (!text) return null;
-    if (RESET_RE.test(text)) {
-      const command2 = emptyCommand();
-      command2.reset = true;
-      command2.explanation = "Cleared every filter.";
-      return command2;
-    }
-    if (OFF_RE.test(text)) return parseOffCommand(text);
+  function parseResetCommand() {
     const command = emptyCommand();
+    command.reset = true;
+    command.explanation = "Cleared every filter.";
+    return command;
+  }
+  function applyRules(text, current, command) {
     const labels = [];
     for (const rule of [...RELATIVE_RULES, ...CONDITION_RULES]) {
       if (!rule.test.test(text)) continue;
       mergePatch(command, typeof rule.patch === "function" ? rule.patch(current) : rule.patch);
       labels.push(rule.label);
     }
+    return labels;
+  }
+  function applyColorAssist(text, current, command) {
     const assist = resolveColorAssist(text);
-    if (assist) {
-      command.colorAssist = assist;
-      if (assist === "correct" && !command.colorMode && !current.colorMode) {
-        command.colorMode = "deuteranopia";
-        labels.push("deuteranopia");
-      }
-      labels.push(assist === "correct" ? "color correction" : "deficiency preview");
+    if (!assist) return [];
+    command.colorAssist = assist;
+    const labels = [];
+    if (assist === "correct" && !command.colorMode && !current.colorMode) {
+      command.colorMode = "deuteranopia";
+      labels.push("deuteranopia");
     }
+    labels.push(assist === "correct" ? "color correction" : "deficiency preview");
+    return labels;
+  }
+  function parseIntent(transcript, current) {
+    const text = normalize(transcript);
+    if (!text) return null;
+    if (RESET_RE.test(text)) return parseResetCommand();
+    if (OFF_RE.test(text)) return parseOffCommand(text);
+    const command = emptyCommand();
+    const labels = [...applyRules(text, current, command), ...applyColorAssist(text, current, command)];
     if (labels.length === 0) return null;
     command.explanation = `Applied ${labels.join(", ")}.`;
     return command;

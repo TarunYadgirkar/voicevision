@@ -243,40 +243,46 @@ function resolveColorAssist(text: string): ColorAssist | null {
   return null;
 }
 
-export function parseIntent(transcript: string, current: FilterState): AccessibilityCommand | null {
-  const text = normalize(transcript);
-  if (!text) return null;
-
-  if (RESET_RE.test(text)) {
-    const command = emptyCommand();
-    command.reset = true;
-    command.explanation = 'Cleared every filter.';
-    return command;
-  }
-
-  if (OFF_RE.test(text)) return parseOffCommand(text);
-
+function parseResetCommand(): AccessibilityCommand {
   const command = emptyCommand();
-  const labels: string[] = [];
+  command.reset = true;
+  command.explanation = 'Cleared every filter.';
+  return command;
+}
 
+function applyRules(text: string, current: FilterState, command: AccessibilityCommand): string[] {
+  const labels: string[] = [];
   for (const rule of [...RELATIVE_RULES, ...CONDITION_RULES]) {
     if (!rule.test.test(text)) continue;
     mergePatch(command, typeof rule.patch === 'function' ? rule.patch(current) : rule.patch);
     labels.push(rule.label);
   }
+  return labels;
+}
 
+// "I'm colorblind" on its own names no specific deficiency; deuteranopia is by far
+// the most common, and the API prompt makes the same default.
+function applyColorAssist(text: string, current: FilterState, command: AccessibilityCommand): string[] {
   const assist = resolveColorAssist(text);
-  if (assist) {
-    command.colorAssist = assist;
-    // "I'm colorblind" on its own names no specific deficiency; deuteranopia is by far
-    // the most common, and the API prompt makes the same default.
-    if (assist === 'correct' && !command.colorMode && !current.colorMode) {
-      command.colorMode = 'deuteranopia';
-      labels.push('deuteranopia');
-    }
-    labels.push(assist === 'correct' ? 'color correction' : 'deficiency preview');
+  if (!assist) return [];
+  command.colorAssist = assist;
+  const labels: string[] = [];
+  if (assist === 'correct' && !command.colorMode && !current.colorMode) {
+    command.colorMode = 'deuteranopia';
+    labels.push('deuteranopia');
   }
+  labels.push(assist === 'correct' ? 'color correction' : 'deficiency preview');
+  return labels;
+}
 
+export function parseIntent(transcript: string, current: FilterState): AccessibilityCommand | null {
+  const text = normalize(transcript);
+  if (!text) return null;
+  if (RESET_RE.test(text)) return parseResetCommand();
+  if (OFF_RE.test(text)) return parseOffCommand(text);
+
+  const command = emptyCommand();
+  const labels = [...applyRules(text, current, command), ...applyColorAssist(text, current, command)];
   if (labels.length === 0) return null;
 
   command.explanation = `Applied ${labels.join(', ')}.`;

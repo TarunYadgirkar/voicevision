@@ -36,6 +36,57 @@ function extractCommand(raw: string): InterpretedCommand | null {
   return JSON.parse(jsonMatch[0]) as InterpretedCommand;
 }
 
+type ParsedBody = { transcript: string; currentState?: FilterState };
+
+async function readBody(req: NextRequest): Promise<ParsedBody | string> {
+  let body: { transcript?: unknown; currentState?: FilterState };
+  try {
+    body = await req.json();
+  } catch {
+    return 'Expected a JSON body';
+  }
+  const { transcript, currentState } = body;
+  if (typeof transcript !== 'string' || !transcript.trim()) return 'transcript must be a non-empty string';
+  if (transcript.length > MAX_TRANSCRIPT_CHARS) return `transcript must be ${MAX_TRANSCRIPT_CHARS} characters or fewer`;
+  return { transcript, currentState };
+}
+
+async function askGemini(apiKey: string, { transcript, currentState }: ParsedBody): Promise<string> {
+  const ai = new GoogleGenAI({ apiKey });
+  const userContent = currentState
+    ? `currentState: ${JSON.stringify(currentState)}\ntranscript: ${transcript}`
+    : transcript;
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-lite',
+    contents: [{ role: 'user', parts: [{ text: userContent }] }],
+    config: {
+      systemInstruction: SYSTEM_PROMPT,
+      responseMimeType: 'application/json',
+      maxOutputTokens: 384,
+      temperature: 0.1,
+    },
+  });
+  const raw = response.text ?? '';
+  if (raw.trim()) return raw;
+  const part = response.candidates?.[0]?.content?.parts?.find(
+    (p: { thought?: boolean; text?: string }) => !p.thought && p.text
+  );
+  return part?.text ?? '';
+}
+
+function upstreamErrorResponse(err: unknown, headers: Record<string, string>) {
+  console.error('Gemini error:', err);
+  const errShape = err as { status?: number; httpStatusCode?: number } | null;
+  const status = errShape?.status || errShape?.httpStatusCode || 500;
+  if (status === 429) {
+    return NextResponse.json(
+      { error: 'Rate limit reached — try again in a minute' },
+      { status: 429, headers: { ...headers, 'Retry-After': '60' } }
+    );
+  }
+  return NextResponse.json({ error: 'Failed to interpret command' }, { status: 500, headers });
+}
+
 export async function POST(req: NextRequest) {
   const headers = corsHeaders(req);
 
@@ -55,67 +106,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { transcript?: unknown; currentState?: FilterState };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Expected a JSON body' }, { status: 400, headers });
-  }
-
-  const { transcript, currentState } = body;
-  if (typeof transcript !== 'string' || !transcript.trim()) {
-    return NextResponse.json({ error: 'transcript must be a non-empty string' }, { status: 400, headers });
-  }
-  if (transcript.length > MAX_TRANSCRIPT_CHARS) {
-    return NextResponse.json(
-      { error: `transcript must be ${MAX_TRANSCRIPT_CHARS} characters or fewer` },
-      { status: 400, headers }
-    );
-  }
+  const body = await readBody(req);
+  if (typeof body === 'string') return NextResponse.json({ error: body }, { status: 400, headers });
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
-    const userContent = currentState
-      ? `currentState: ${JSON.stringify(currentState)}\ntranscript: ${transcript}`
-      : transcript;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
-      contents: [{ role: 'user', parts: [{ text: userContent }] }],
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        responseMimeType: 'application/json',
-        maxOutputTokens: 384,
-        temperature: 0.1,
-      },
-    });
-
-    let raw = response.text ?? '';
-    if (!raw.trim()) {
-      const part = response.candidates?.[0]?.content?.parts?.find(
-        (p: { thought?: boolean; text?: string }) => !p.thought && p.text
-      );
-      raw = part?.text ?? '';
-    }
-
+    const raw = await askGemini(apiKey, body);
     const command = extractCommand(raw);
     if (!command) {
       console.error('No JSON in Gemini response:', raw);
       return NextResponse.json({ error: 'Failed to interpret command' }, { status: 500, headers });
     }
-
     normalizeOffFlags(command);
     return NextResponse.json(command, { headers });
   } catch (err: unknown) {
-    console.error('Gemini error:', err);
-    const errShape = err as { status?: number; httpStatusCode?: number } | null;
-    const status = errShape?.status || errShape?.httpStatusCode || 500;
-    if (status === 429) {
-      return NextResponse.json(
-        { error: 'Rate limit reached — try again in a minute' },
-        { status: 429, headers: { ...headers, 'Retry-After': '60' } }
-      );
-    }
-    return NextResponse.json({ error: 'Failed to interpret command' }, { status: 500, headers });
+    return upstreamErrorResponse(err, headers);
   }
 }
