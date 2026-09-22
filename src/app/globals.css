@@ -91,6 +91,13 @@
   --font-display: var(--font-bricolage);
 }
 
+/* Without an explicit background on <html>, the browser propagates <body>'s background
+   to the canvas, which sits outside body's filter. Dark mode then inverted the cards but
+   left the page behind them light. Painting <html> stops the propagation. */
+html {
+  background: var(--page);
+}
+
 body {
   background: var(--page);
   color: var(--text);
