@@ -99,7 +99,7 @@ function ToggleButton({ adaptation, active, onToggle }: { adaptation: Adaptation
         transition-[background-color,box-shadow,scale] duration-150 ease-[cubic-bezier(0.2,0,0,1)] active:scale-96
         ${active ? 'bg-accent-soft ring-1 ring-accent' : 'bg-raised hover:bg-surface'}`}
     >
-      <span>
+      <span className="min-w-0">
         <span className="block text-sm text-text">{adaptation.label}</span>
         <span className="block text-sm text-muted">{adaptation.hint}</span>
       </span>
@@ -122,7 +122,7 @@ function IntensitySliders({ state, onIntensityChange }: Pick<Props, 'state' | 'o
     <div className="space-y-2.5 rounded-lg bg-surface p-3">
       {keys.map(key => (
         <label key={key} className="flex items-center gap-3 text-sm text-text">
-          <span className="w-32 shrink-0">{INTENSITY_LABELS[key]}</span>
+          <span className="w-24 shrink-0 sm:w-32">{INTENSITY_LABELS[key]}</span>
           <input
             type="range"
             min={0}

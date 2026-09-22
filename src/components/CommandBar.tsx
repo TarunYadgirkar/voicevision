@@ -51,7 +51,7 @@ export function CommandBar({ onSubmit, onReset, pending, error, entries }: Props
     <div className="space-y-3">
       <form onSubmit={submitDraft} className="flex items-center gap-2.5">
         <VoiceButton onSubmit={onSubmit} pending={pending} buttonRef={micRef} />
-        <div className="flex flex-1 items-center gap-1.5 rounded-full border border-line bg-raised pl-4 pr-1.5 py-1.5 focus-within:ring-2 focus-within:ring-accent">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-full border border-line bg-raised pl-4 pr-1.5 py-1.5 focus-within:ring-2 focus-within:ring-accent">
           <input
             ref={inputRef}
             value={draft}
@@ -73,7 +73,7 @@ export function CommandBar({ onSubmit, onReset, pending, error, entries }: Props
         </div>
       </form>
 
-      <p className="text-sm text-faint">
+      <p className="text-sm text-faint text-balance">
         Press <kbd className="rounded-sm bg-sunken px-1.5 py-0.5 text-text">/</kbd> to type,{' '}
         <kbd className="rounded-sm bg-sunken px-1.5 py-0.5 text-text">Space</kbd> on the microphone to listen, and{' '}
         <kbd className="rounded-sm bg-sunken px-1.5 py-0.5 text-text">Esc</kbd> to clear everything.
