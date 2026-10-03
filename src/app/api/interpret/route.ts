@@ -1,39 +1,20 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { AccessibilityCommand, FilterState } from '@/types';
+import { validateCommand, protectAssistiveCommand } from '@/lib/command';
+import { normalizeFilterState } from '@/lib/persistence';
 import { SYSTEM_PROMPT } from './prompt';
 import { corsHeaders } from './cors';
 import { checkRateLimit } from './rateLimit';
 
 const MAX_TRANSCRIPT_CHARS = 300;
 
-type InterpretedCommand = AccessibilityCommand & {
-  colorAssist?: 'simulate' | 'correct' | null;
-};
-
 export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, { status: 204, headers: corsHeaders(req) });
 }
 
-function normalizeOffFlags(command: InterpretedCommand): void {
-  const boolKeys = ['darkMode', 'highContrast', 'warmTone', 'invertColors', 'blur', 'dimOverlay', 'boldText', 'reduceMotion'] as const;
-  const allKeys = ['colorMode', ...boolKeys, 'brightness', 'zoom', 'hemianopia', 'intensities'] as const;
-
-  const hasPositive = allKeys.some((k) => {
-    const v = command[k];
-    return v !== null && v !== undefined && v !== false;
-  });
-  if (!hasPositive) return;
-
-  for (const key of boolKeys) {
-    if (command[key] === false) command[key] = null;
-  }
-}
-
-function extractCommand(raw: string): InterpretedCommand | null {
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return null;
-  return JSON.parse(jsonMatch[0]) as InterpretedCommand;
+function extractCommand(raw: string): AccessibilityCommand | null {
+  return validateCommand(JSON.parse(raw));
 }
 
 type ParsedBody = { transcript: string; currentState?: FilterState };
@@ -41,14 +22,16 @@ type ParsedBody = { transcript: string; currentState?: FilterState };
 async function readBody(req: NextRequest): Promise<ParsedBody | string> {
   let body: { transcript?: unknown; currentState?: FilterState };
   try {
-    body = await req.json();
+    const parsed: unknown = await req.json();
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return 'Expected a JSON object';
+    body = parsed as typeof body;
   } catch {
     return 'Expected a JSON body';
   }
   const { transcript, currentState } = body;
   if (typeof transcript !== 'string' || !transcript.trim()) return 'transcript must be a non-empty string';
   if (transcript.length > MAX_TRANSCRIPT_CHARS) return `transcript must be ${MAX_TRANSCRIPT_CHARS} characters or fewer`;
-  return { transcript, currentState };
+  return { transcript: transcript.trim(), currentState: currentState ? normalizeFilterState(currentState) : undefined };
 }
 
 async function askGemini(apiKey: string, { transcript, currentState }: ParsedBody): Promise<string> {
@@ -75,7 +58,7 @@ async function askGemini(apiKey: string, { transcript, currentState }: ParsedBod
 }
 
 function upstreamErrorResponse(err: unknown, headers: Record<string, string>) {
-  console.error('Gemini error:', err);
+  console.error('Interpretation service failed');
   const errShape = err as { status?: number; httpStatusCode?: number } | null;
   const status = errShape?.status || errShape?.httpStatusCode || 500;
   if (status === 429) {
@@ -113,11 +96,10 @@ export async function POST(req: NextRequest) {
     const raw = await askGemini(apiKey, body);
     const command = extractCommand(raw);
     if (!command) {
-      console.error('No JSON in Gemini response:', raw);
+      console.error('Invalid interpretation response');
       return NextResponse.json({ error: 'Failed to interpret command' }, { status: 500, headers });
     }
-    normalizeOffFlags(command);
-    return NextResponse.json(command, { headers });
+    return NextResponse.json(protectAssistiveCommand(command, body.transcript), { headers });
   } catch (err: unknown) {
     return upstreamErrorResponse(err, headers);
   }

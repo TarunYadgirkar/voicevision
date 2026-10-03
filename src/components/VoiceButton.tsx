@@ -6,6 +6,7 @@ import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 interface Props {
   onSubmit: (transcript: string) => void;
   pending: boolean;
+  cancellationRevision: number;
   buttonRef?: RefObject<HTMLButtonElement | null>;
 }
 
@@ -16,8 +17,8 @@ function iconState(visible: boolean): string {
   return visible ? 'opacity-100 scale-100 blur-0' : 'opacity-0 scale-25 blur-[4px]';
 }
 
-export function VoiceButton({ onSubmit, pending, buttonRef }: Props) {
-  const { listening, startListening, stopListening, supported } = useSpeechRecognition(onSubmit);
+export function VoiceButton({ onSubmit, pending, buttonRef, cancellationRevision }: Props) {
+  const { listening, startListening, stopListening, supported, error } = useSpeechRecognition(onSubmit, cancellationRevision);
 
   if (!supported) {
     return (
@@ -31,11 +32,12 @@ export function VoiceButton({ onSubmit, pending, buttonRef }: Props) {
   const label = listening ? 'Stop listening' : 'Speak a command';
 
   return (
+    <div className="flex flex-col items-start gap-2">
     <button
       ref={buttonRef}
       type="button"
       onClick={listening ? stopListening : startListening}
-      disabled={pending}
+      disabled={pending && !listening}
       aria-pressed={listening}
       aria-label={label}
       className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full
@@ -51,5 +53,8 @@ export function VoiceButton({ onSubmit, pending, buttonRef }: Props) {
         <CircleNotch size={24} weight="bold" aria-hidden className={`${ICON_BASE} ${iconState(pending)} animate-spin`} />
       </span>
     </button>
+    <span role="status" className="sr-only">{listening ? 'Listening. Speak your reading request.' : pending ? 'Interpreting command.' : 'Microphone idle.'}</span>
+    {error && <p role="alert" className="max-w-64 text-sm text-text">{error}</p>}
+    </div>
   );
 }

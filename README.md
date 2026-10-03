@@ -1,135 +1,49 @@
 # VoiceVision
 
-Voice-activated screen accessibility for people with visual impairments. Speak your needs — VoiceVision adapts your display in real time.
+Adjustable reading tools for people with low vision and other access needs. Use voice, typing, or manual controls; common commands work without AI.
 
-Built at AI Hackathon with The AI Collective Tri-Valley | Humans in AI Week, June 7, 2026.
+## What works
 
----
+- Text size (100–200%), line spacing, brightness, optional contrast, color and motion adjustments.
+- Need-based starting points, a personal reading preview, saved preferences, undo and reset.
+- Keyboard controls and native radio groups; microphone errors explain typing/manual alternatives.
+- Chrome/Edge extension applies the shared engine to ordinary webpages, with settings per site or globally.
+- Cloud interpretation is off by default. Enable it to send unfamiliar command text and settings to the server and Google Gemini. Page content is not sent. Browser speech recognition may use the browser vendor's speech service separately.
 
-## Setup (5 minutes)
+These are adjustable access tools, not treatment. Blindness in one eye is different from loss of half the visual field. VoiceVision does not mask half the display to “help” either condition. Condition-only commands leave settings unchanged; compound requests apply only the requested adjustment. Color shifts and warm tint are optional preferences, not proven vision correction or eye protection. See [evidence and limits](docs/EVIDENCE.md) and [software validation](docs/VALIDATION.md).
 
-### 1. Clone and install
+## Run locally
 
-```bash
-git clone <your-repo-url>
-cd voicevision
-npm install
-```
+Requires a Node version supported by Next.js 16.3.
 
-### 2. Get your free API key
-
-Go to **https://aistudio.google.com/apikey** — log in with Google, create a key.  
-No credit card. No billing. Free tier: 1,500 requests/day.
-
-### 3. Set your key
-
-```bash
-cp .env.example .env.local
-# Edit .env.local — paste your key as GEMINI_API_KEY=AIza...
-```
-
-### 4. Run
-
-```bash
+```sh
+npm ci
 npm run dev
 ```
 
-Open **http://localhost:3000** in **Chrome or Edge** (required for voice).
+Open http://localhost:3000. Typing and manual controls work without an API key. For optional cloud parsing, copy `.env.example` to `.env.local` and set `GEMINI_API_KEY` server-side. Speech support depends on browser and microphone permissions; Chrome/Edge are the target extension browsers.
 
----
-
-## Deploy to Vercel (free)
-
-```bash
-npm i -g vercel
-vercel
+```sh
+npm test
+npm run lint
+npx tsc --noEmit
+npm run build
+npm run build:ext
 ```
 
-Add `GEMINI_API_KEY` in the Vercel dashboard under Project → Settings → Environment Variables.  
-Or connect your GitHub repo at vercel.com/dashboard for auto-deploy on push.
+## Install extension
 
----
+1. Build with `npm run build:ext`.
+2. Open `chrome://extensions` or Edge's Extensions page.
+3. Enable Developer mode, choose Load unpacked, select `extension/`.
+4. Open an ordinary website, then open VoiceVision from the toolbar.
 
-## Voice Commands
+Typing and manual controls are available in the popup. Alt+Shift+V opens it. Browser settings pages, extension stores, and some protected/PDF pages cannot be changed. Manual installation remains required; there is no Chrome Web Store release yet. See [extension privacy](extension/PRIVACY.md).
 
-| You say | What happens |
-|---|---|
-| "I have red-green colorblindness" | Deuteranopia filter |
-| "Make it dark" | Dark mode |
-| "Too bright in here" | Dark mode + reduced brightness |
-| "High contrast please" | Contrast boost |
-| "I'm light sensitive" | Dark mode + warm tone |
-| "Macular degeneration" | Center magnification |
-| "Reset to normal" | All filters cleared |
+## Deployment and security boundaries
 
-Commands stack. Say "dark mode" then "high contrast" and both apply.
+Next.js API uses validated command input/output and a server-only Gemini key. Local parser handles common requests; cloud responses time out and obsolete replies cannot overwrite newer settings. Rate limiting caps each client at 20/minute and each server instance at 100/minute, with bounded tracked keys. This is a per-instance quota guard, not distributed abuse protection or authentication. A public launch needs deployment-level/shared quotas and provider spending limits.
 
----
+Production dependency audit was clean during October 2, 2026 checks. Development dependencies have upstream advisories; do not expose development/test servers publicly. Product changes still require checks with disabled users and live assistive technology; software tests do not establish clinical effectiveness.
 
-## Stack
-
-- **Next.js 14+** App Router, TypeScript
-- **Web Speech API** — browser native, free, no signup
-- **Google Gemini 2.5 Flash** — interprets natural language into commands (free tier)
-- **SVG feColorMatrix** — clinically accurate color blindness simulation
-- **Tailwind CSS**
-- **Vercel** — free Hobby tier, HTTPS included
-
----
-
-## Chrome Extension (use on any site)
-
-The `extension/` folder is a Manifest V3 extension that applies the same adaptations to any
-webpage, not just the VoiceVision demo site.
-
-1. Open `chrome://extensions`
-2. Enable **Developer mode** (top right)
-3. Click **Load unpacked** -> select the `extension/` folder
-4. Pin the VoiceVision icon, open it on any site, and either press the mic or use the controls
-
-**Voice is not the only way in.** The popup carries a labelled button for every adaptation
-(dark mode, high contrast, warm tone, invert, bold text, reduce motion, dim screen, each color
-vision mode, each magnifier, and left/right field loss), sliders for the strength of whatever is
-on, a choice between correcting colors for you and previewing a deficiency, and a choice between
-applying settings to this site or to all sites.
-
-**Alt+Shift+V** opens the popup from anywhere. Rebind it at `chrome://extensions/shortcuts`.
-
-Spoken commands are interpreted on the device first by the content script's own parser. Only when
-that parser cannot place a phrase does the popup call `/api/interpret`, and then it sends just the
-transcript and the currently active adaptations. `extension/PRIVACY.md` has the full account.
-
----
-
-## Security
-
-- **CORS allowlist.** `/api/interpret` answers with `Access-Control-Allow-Origin` only for the
-  request's own origin, any `chrome-extension://` origin, and `http://localhost` (or `127.0.0.1`)
-  for local development. Every other origin gets no allow header, so the browser blocks the read.
-  Responses carry `Vary: Origin`.
-- **Input caps.** `transcript` must be a non-empty string of 300 characters or fewer; anything
-  else is a 400.
-- **Rate limit.** 20 requests per minute per IP in a sliding window, answered with 429 and a
-  `Retry-After` header. The counter lives in memory, so on serverless it is per-instance. It is a
-  guard on the Gemini free-tier quota, not a security boundary.
-- **Key handling.** The Gemini client is built inside the request handler. With `GEMINI_API_KEY`
-  unset the route returns 503 with a clear message instead of failing at import time. The key
-  never reaches the client.
-
----
-
-## Browser Support
-
-**Works:** Chrome 25+, Edge (Chromium)  
-**Partial:** Safari (iOS 14.5+)  
-**No:** Firefox  
-
-Run the demo in Chrome.
-
----
-
-## For AI Coding Assistants
-
-Read `CLAUDE.md` (Claude Code) or `AGENTS.md` (Cursor, Windsurf, Copilot) for full context.  
-Read `SKILLS.md` for copy-pasteable implementations of every major component.  
-Architecture decisions, exact filter values, and API design are all documented.
+Originally built at AI Collective Tri-Valley hackathon, June 2026. Current architecture and agent rules: [AGENTS.md](AGENTS.md).

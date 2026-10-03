@@ -1,331 +1,129 @@
 const API_URL = 'https://voicevision-eight.vercel.app/api/interpret';
 const SITE_URL = 'https://voicevision-eight.vercel.app';
 const MAX_TRANSCRIPT_CHARS = 300;
-
-const micBtn = document.getElementById('micBtn');
-const micLabel = document.getElementById('micLabel');
-const openSiteBtn = document.getElementById('openSiteBtn');
-const transcriptEl = document.getElementById('transcript');
-const explanationEl = document.getElementById('explanation');
-const filtersEl = document.getElementById('filters');
-const controlsEl = document.getElementById('controls');
-
-const CHECK_SVG = `<svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
-  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg>`;
-
-// Every adaptation the content script understands, grouped so related controls sit together.
-// `key` is the state field; `value` is what an on-press sets it to (true for plain switches).
-const CONTROL_GROUPS = [
-  {
-    title: 'Display',
-    items: [
-      { key: 'darkMode', value: true, label: 'Dark mode' },
-      { key: 'highContrast', value: true, label: 'High contrast' },
-      { key: 'warmTone', value: true, label: 'Warm tone' },
-      { key: 'invertColors', value: true, label: 'Invert colors' },
-      { key: 'boldText', value: true, label: 'Bold text' },
-      { key: 'reduceMotion', value: true, label: 'Reduce motion' },
-      { key: 'dimOverlay', value: true, label: 'Dim screen' },
-    ],
-  },
-  {
-    title: 'Color vision',
-    items: [
-      { key: 'colorMode', value: 'deuteranopia', label: 'Deuteranopia' },
-      { key: 'colorMode', value: 'protanopia', label: 'Protanopia' },
-      { key: 'colorMode', value: 'tritanopia', label: 'Tritanopia' },
-      { key: 'colorMode', value: 'achromatopsia', label: 'No color vision' },
-    ],
-  },
-  {
-    title: 'Magnify',
-    items: [
-      { key: 'zoom', value: 'full', label: 'Whole page' },
-      { key: 'zoom', value: 'center', label: 'Around the center' },
-      { key: 'zoom', value: 'peripheral', label: 'Around the edges' },
-    ],
-  },
-  {
-    title: 'Field loss on one side',
-    items: [
-      { key: 'hemianopia', value: 'left', label: 'Left side' },
-      { key: 'hemianopia', value: 'right', label: 'Right side' },
-    ],
-  },
-];
-
-const COLOR_ASSIST_SEGMENT = {
-  title: 'What the color change is for',
-  field: 'colorAssist',
-  options: [
-    { value: 'correct', label: 'Correct colors' },
-    { value: 'simulate', label: 'Preview deficiency' },
-  ],
-};
-
-const SCOPE_SEGMENT = {
-  title: 'Where these settings apply',
-  field: 'scope',
-  options: [
-    { value: 'site', label: 'This site' },
-    { value: 'global', label: 'All sites' },
-  ],
-};
-
-const SLIDER_ROWS = [
-  { key: 'colorMode', intensityKey: 'colorMode', label: 'Color vision' },
-  { key: 'darkMode', intensityKey: 'darkMode', label: 'Dark mode' },
-  { key: 'highContrast', intensityKey: 'highContrast', label: 'High contrast' },
-  { key: 'warmTone', intensityKey: 'warmTone', label: 'Warm tone' },
-  { key: 'invertColors', intensityKey: 'invertColors', label: 'Invert colors' },
-  { key: 'blur', intensityKey: 'blur', label: 'Clarity boost' },
-  { key: 'zoom', intensityKey: 'zoom', label: 'Magnification' },
-  { key: 'dimOverlay', intensityKey: 'dimOverlay', label: 'Screen dimming' },
-];
-
+const el = id => document.getElementById(id);
+const micBtn = el('micBtn');
+const micLabel = el('micLabel');
+const explanationEl = el('explanation');
+const controlsEl = el('controls');
+const filtersEl = el('filters');
 let lastState = null;
-let scope = 'site';
+let scope = 'global';
 let activePort = null;
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-}
-
-function isOn(state, item) {
-  if (!state) return false;
-  return item.value === true ? state[item.key] === true : state[item.key] === item.value;
-}
-
-function toggleHtml(pressed, dataAttrs, label) {
-  return `<button type="button" class="toggle" aria-pressed="${pressed}" ${dataAttrs}>
-    ${CHECK_SVG}<span class="toggle-label">${escapeHtml(label)}</span>
-  </button>`;
-}
-
-function groupHtml(group, state) {
-  const buttons = group.items
-    .map((item) =>
-      toggleHtml(
-        isOn(state, item),
-        `data-key="${item.key}" data-value="${escapeHtml(item.value)}"`,
-        item.label
-      )
-    )
-    .join('');
-  return `<h2 class="group-title">${escapeHtml(group.title)}</h2>
-    <div class="toggle-grid">${buttons}</div>`;
-}
-
-function segmentHtml(segment, current) {
-  const buttons = segment.options
-    .map((option) =>
-      toggleHtml(current === option.value, `data-segment="${segment.field}" data-value="${option.value}"`, option.label)
-    )
-    .join('');
-  return `<h2 class="group-title">${escapeHtml(segment.title)}</h2>
-    <div class="segmented" role="group" aria-label="${escapeHtml(segment.title)}">${buttons}</div>`;
-}
-
-function renderControls(state) {
-  const groups = CONTROL_GROUPS.map((group) => groupHtml(group, state)).join('');
-  const colorAssist = segmentHtml(COLOR_ASSIST_SEGMENT, state?.colorAssist ?? null);
-  const scopeSegment = segmentHtml(SCOPE_SEGMENT, scope);
-  controlsEl.innerHTML = groups + colorAssist + scopeSegment;
-}
-
-function sliderRowHtml(row, state) {
-  const value = state.intensities?.[row.intensityKey] ?? 1;
-  return `<div class="filter-row">
-    <span class="filter-label">${escapeHtml(row.label)}</span>
-    <input type="range" class="filter-slider" data-intensity-key="${row.intensityKey}"
-      min="0" max="1" step="0.05" value="${value}"
-      aria-label="${escapeHtml(row.label)} strength">
-  </div>`;
-}
-
-function brightnessRowHtml(state) {
-  return `<div class="filter-row">
-    <span class="filter-label">Brightness</span>
-    <input type="range" class="filter-slider" data-intensity-key="brightness"
-      min="0.1" max="1.5" step="0.05" value="${state.brightness}" aria-label="Brightness">
-  </div>`;
-}
-
-function renderSliders(state) {
-  const rows = SLIDER_ROWS.filter((row) => Boolean(state?.[row.key])).map((row) => sliderRowHtml(row, state));
-  if (state && state.brightness !== null && state.brightness !== undefined) {
-    rows.push(brightnessRowHtml(state));
-  }
-  filtersEl.innerHTML = rows.length
-    ? rows.join('')
-    : '<span class="empty">Nothing is on yet</span>';
-}
-
-function render(state) {
-  if (state) lastState = state;
-  renderSliders(lastState);
-  renderControls(lastState);
-}
-
-async function sendToActiveTab(message) {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) return null;
+let requestRevision = 0;
+let pendingController = null;
+const GROUPS = [
+  ['Display', [['darkMode', true, 'Dark mode'], ['highContrast', true, 'High contrast'], ['warmTone', true, 'Warm tone'], ['invertColors', true, 'Invert colors'], ['boldText', true, 'Bold text'], ['reduceMotion', true, 'Reduce motion'], ['dimOverlay', true, 'Dim screen']]],
+  ['Optional color adjustments', [['colorMode', 'deuteranopia', 'Deutan adjustment'], ['colorMode', 'protanopia', 'Protan adjustment'], ['colorMode', 'tritanopia', 'Tritan adjustment'], ['colorMode', 'achromatopsia', 'Contrast adjustment']]],
+];
+const PRESETS = { reading: { textScale: 1.3, lineSpacing: 1.9, boldText: true }, glare: { brightness: 0.8, warmTone: true }, contrast: { highContrast: true, boldText: true }, calm: { reduceMotion: true } };
+function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`); }
+function invalidate() { requestRevision += 1; pendingController?.abort(); pendingController = null; const port = activePort; activePort = null; port?.disconnect(); setMicIdle(); }
+function status(text) { explanationEl.textContent = text; }
+async function send(message) {
   try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) throw new Error('No active page');
     return await chrome.tabs.sendMessage(tab.id, message);
   } catch {
-    return null; // no content script here (chrome:// pages, the web store, a tab still loading)
+    status('Open a regular website, then reopen VoiceVision. Browser settings, extension stores and some PDF pages cannot be adjusted.');
+    return null;
   }
 }
-
-function coerceValue(raw) {
-  return raw === 'true' ? true : raw;
+function render(state) {
+  if (!state || state.error) { if (state?.error) status(state.error); return; }
+  lastState = state;
+  const focused = document.activeElement.dataset.controlId;
+  filtersEl.innerHTML = [['textScale', 'Text size', 1, 2, 0.1, state.textScale ?? 1], ['lineSpacing', 'Line spacing', 1.4, 2.4, 0.1, state.lineSpacing ?? 1.6], ['brightness', 'Brightness', 0.1, 1.5, 0.05, state.brightness ?? 1]].map(([key, label, min, max, step, value]) => `<div class="filter-row"><label for="reading-${key}">${label}<output>${key === 'lineSpacing' ? Number(value).toFixed(1) : `${Math.round(value * 100)}%`}</output></label><input id="reading-${key}" data-control-id="${key}" data-reading="${key}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" aria-valuetext="${key === 'lineSpacing' ? `${value} times` : `${Math.round(value * 100)} percent`}"></div>`).join('');
+  controlsEl.innerHTML = GROUPS.map(([title, items]) => `<section><h2>${title}</h2><div class="toggle-grid">${items.map(([key, value, label]) => `<button type="button" data-control-id="${key}-${value}" data-key="${key}" data-value="${value}" aria-pressed="${state[key] === value}">${escapeHtml(label)}</button>`).join('')}</div></section>`).join('') + `<section><h2>Save settings for</h2><div class="segmented">${['site', 'global'].map(value => `<button type="button" data-control-id="scope-${value}" data-scope="${value}" aria-pressed="${scope === value}">${value === 'site' ? 'This site' : 'All sites'}</button>`).join('')}</div></section>`;
+  if (focused) document.querySelector(`[data-control-id="${focused}"]`)?.focus();
 }
-
-// On-press sends APPLY_COMMAND so the content script merges the field into its state;
-// off-press sends TOGGLE_FILTER, the same message the popup has always used to clear one filter.
-async function toggleAdaptation(key, rawValue) {
-  const value = coerceValue(rawValue);
-  const item = { key, value };
-  const message = isOn(lastState, item)
-    ? { type: 'TOGGLE_FILTER', key }
-    : { type: 'APPLY_COMMAND', command: { [key]: value, reset: false } };
-  render(await sendToActiveTab(message));
+async function manual(message) {
+  invalidate();
+  const revision = requestRevision;
+  const result = await send(message);
+  if (revision !== requestRevision) return;
+  if (result?.state) { scope = result.scope; render(result.state); }
+  else render(result);
+  if (result && !result.error) status('Settings applied. Undo restores your previous settings.');
 }
-
-async function setColorAssist(value) {
-  const next = lastState?.colorAssist === value ? null : value;
-  render(await sendToActiveTab({ type: 'APPLY_COMMAND', command: { colorAssist: next, reset: false } }));
-}
-
-async function setScope(value) {
-  scope = value;
-  const state = await sendToActiveTab({ type: 'vv:scope', scope: value });
-  render(state);
-}
-
-controlsEl.addEventListener('click', (e) => {
-  const button = e.target.closest('.toggle');
+controlsEl.addEventListener('click', event => {
+  const button = event.target.closest('button');
   if (!button) return;
-  const { segment, key, value } = button.dataset;
-  if (segment === 'colorAssist') return void setColorAssist(value);
-  if (segment === 'scope') return void setScope(value);
-  if (key) return void toggleAdaptation(key, value);
+  if (button.dataset.scope) return void manual({ type: 'vv:scope', scope: button.dataset.scope });
+  const { key, value: raw } = button.dataset;
+  const value = raw === 'true' ? true : raw;
+  void manual(lastState?.[key] === value ? { type: 'TOGGLE_FILTER', key } : { type: 'APPLY_COMMAND', command: { [key]: value, colorAssist: 'correct', reset: false } });
 });
-
-filtersEl.addEventListener('change', async (e) => {
-  if (!e.target.matches('.filter-slider')) return;
-  const key = e.target.dataset.intensityKey;
-  const value = parseFloat(e.target.value);
-  render(await sendToActiveTab({ type: 'SET_INTENSITY', key, value }));
+filtersEl.addEventListener('change', event => {
+  if (!event.target.dataset.reading) return;
+  void manual({ type: 'SET_READING', key: event.target.dataset.reading, value: Number(event.target.value) });
 });
-
-async function interpretRemotely(text) {
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ transcript: text, currentState: lastState }),
-  });
-  return res.json();
-}
-
-// Local first: the content script's own parser handles the common phrasings offline, and the
-// transcript only leaves the device when it replies { handled: false } or cannot answer at all.
+document.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => void manual({ type: 'APPLY_COMMAND', command: { ...PRESETS[button.dataset.preset], reset: false } })));
+el('undoBtn').addEventListener('click', () => void manual({ type: 'UNDO' }));
+el('resetBtn').addEventListener('click', () => void manual({ type: 'APPLY_COMMAND', command: { reset: true } }));
+el('cloudOptIn').addEventListener('change', () => { invalidate(); chrome.storage.local.set({ vvCloudOptIn: el('cloudOptIn').checked }); status(el('cloudOptIn').checked ? 'Cloud interpretation enabled for unrecognized commands.' : 'Cloud interpretation off. Common commands and buttons still work.'); });
 async function handleTranscript(rawText) {
-  const text = rawText.slice(0, MAX_TRANSCRIPT_CHARS);
-  transcriptEl.textContent = `“${text}”`;
-  explanationEl.textContent = 'Working on it…';
-
-  const local = await sendToActiveTab({ type: 'vv:interpret', transcript: text });
-  if (local?.handled) {
-    explanationEl.textContent = 'Applied locally';
-    render(local.state);
-    return;
-  }
-
+  const text = typeof rawText === 'string' ? rawText.trim().slice(0, MAX_TRANSCRIPT_CHARS) : '';
+  if (!text) { status('Enter a command first.'); return; }
+  invalidate();
+  const revision = requestRevision;
+  el('transcript').textContent = `“${text}”`;
+  if (/^undo( last( change)?)?$/i.test(text)) { await manual({ type: 'UNDO' }); return; }
+  status('Checking command…');
+  const local = await send({ type: 'vv:interpret', transcript: text });
+  if (revision !== requestRevision || !local) return;
+  if (local.handled) { render(local.state); status(local.command.explanation || 'Applied on this device.'); return; }
+  if (!el('cloudOptIn').checked) { status('Command not recognized. Try “larger text”, “less glare”, or use the buttons. Cloud interpretation is optional in privacy settings.'); return; }
+  await interpretRemotely(text, local.revision, revision);
+}
+async function interpretRemotely(text, expectedRevision, revision) {
+  const controller = new AbortController();
+  pendingController = controller;
+  const timer = setTimeout(() => controller.abort(), 12000);
   try {
-    const command = await interpretRemotely(text);
-    if (command.error) {
-      explanationEl.textContent = command.error;
-      return;
-    }
-    explanationEl.textContent = command.explanation ?? '';
-    render(await sendToActiveTab({ type: 'APPLY_COMMAND', command }));
+    const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transcript: text, currentState: lastState }), signal: controller.signal });
+    if (!response.ok) throw new Error('Unavailable');
+    const command = await response.json();
+    if (revision !== requestRevision) return;
+    const result = await send({ type: 'APPLY_COMMAND', command, expectedRevision, transcript: text });
+    if (revision !== requestRevision || !result) return;
+    render(result);
+    if (!result.error) status('Cloud command applied. Undo restores your previous settings.');
   } catch {
-    explanationEl.textContent = 'Could not reach VoiceVision — check your connection.';
-  }
+    if (revision === requestRevision) status('Cloud interpretation unavailable or timed out. Use a common command or the buttons.');
+  } finally { clearTimeout(timer); if (pendingController === controller) pendingController = null; }
 }
-
-function setMicIdle() {
-  micBtn.classList.remove('listening');
-  micLabel.textContent = 'Speak a command';
-}
-
-function handleMicError(error) {
-  setMicIdle();
-  if (error === 'unsupported') {
-    transcriptEl.textContent = 'Voice is not supported on this page — try Chrome on a regular https:// site.';
-    return;
-  }
-  if (error === 'not-allowed' || error === 'service-not-allowed') {
-    transcriptEl.textContent =
-      'Microphone access is blocked. Open site settings from the address bar of this tab, allow the microphone, then try again.';
-    return;
-  }
-  transcriptEl.textContent = `Microphone error: ${error}`;
-}
-
-function handlePortMessage(msg) {
-  if (msg.type === 'start') {
-    micBtn.classList.add('listening');
-    micLabel.textContent = 'Listening — press to stop';
-    return;
-  }
-  if (msg.type === 'end') {
-    activePort = null;
-    setMicIdle();
-    return;
-  }
-  if (msg.type === 'result') return void handleTranscript(msg.transcript);
-  if (msg.type === 'error') handleMicError(msg.error);
-}
-
-// Recognition runs in the content script (page origin) — chrome-extension:// popup
-// origins can't hold a mic permission grant. Results stream back over a port.
-async function startListening() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) {
-    transcriptEl.textContent = 'No active tab — open a regular webpage to use voice commands.';
-    return;
-  }
-
-  let port;
-  try {
-    port = chrome.tabs.connect(tab.id, { name: 'voicevision-mic' });
-  } catch {
-    transcriptEl.textContent = 'Open a regular webpage to use voice commands.';
-    return;
-  }
-
-  activePort = port;
-  port.onDisconnect.addListener(() => {
-    activePort = null;
-    setMicIdle();
-    if (chrome.runtime.lastError) {
-      transcriptEl.textContent = 'Open a regular webpage (not a chrome:// page) to use voice commands.';
-    }
-  });
-  port.onMessage.addListener(handlePortMessage);
-  port.postMessage({ type: 'START' });
-}
-
-micBtn.addEventListener('click', () => {
-  if (!activePort) return void startListening();
-  activePort.postMessage({ type: 'STOP' });
-  activePort.disconnect();
+el('commandForm').addEventListener('submit', event => { event.preventDefault(); void handleTranscript(el('commandInput').value); });
+function setMicIdle() { micBtn.classList.remove('listening'); micBtn.setAttribute('aria-pressed', 'false'); micLabel.textContent = 'Speak a command'; }
+function micError(error) {
+  const port = activePort;
   activePort = null;
+  port?.disconnect();
   setMicIdle();
-});
-
-openSiteBtn.addEventListener('click', () => chrome.tabs.create({ url: SITE_URL }));
-
-sendToActiveTab({ type: 'GET_STATE' }).then(render);
+  const errors = { unsupported: 'Voice unavailable in this browser. Type a command or use the buttons.', 'not-allowed': 'Microphone blocked. Allow microphone access in this site’s browser settings, or type a command.', 'service-not-allowed': 'Speech service blocked. Type a command or use the buttons.', 'audio-capture': 'No microphone found. Type a command or use the buttons.', 'no-speech': 'No speech heard. Try again or type a command.', network: 'Speech service unavailable. Type a command or use the buttons.' };
+  status(errors[error] || 'Voice command failed. Try again, type a command, or use the buttons.');
+}
+async function startListening() {
+  invalidate();
+  const revision = requestRevision;
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (revision !== requestRevision) return;
+    if (!tab?.id) { status('Open a regular website to use voice commands.'); return; }
+    const port = chrome.tabs.connect(tab.id, { name: 'voicevision-mic' });
+    activePort = port;
+    port.onDisconnect.addListener(() => { if (activePort !== port) return; activePort = null; setMicIdle(); if (chrome.runtime.lastError) status('Voice cannot connect to this page. Open a regular website or use typing.'); });
+    port.onMessage.addListener(message => {
+      if (activePort !== port || revision !== requestRevision) return;
+      if (message.type === 'start') { micBtn.classList.add('listening'); micBtn.setAttribute('aria-pressed', 'true'); micLabel.textContent = 'Listening — press to stop'; status('Listening…'); }
+      if (message.type === 'end') { if (activePort === port) activePort = null; setMicIdle(); port.disconnect(); }
+      if (message.type === 'result') void handleTranscript(message.transcript);
+      if (message.type === 'error') micError(message.error);
+    });
+    port.postMessage({ type: 'START' });
+  } catch { status('Voice cannot connect. Type a command or use the buttons.'); setMicIdle(); }
+}
+micBtn.addEventListener('click', () => { if (!activePort) return void startListening(); activePort.postMessage({ type: 'STOP' }); activePort.disconnect(); activePort = null; setMicIdle(); });
+el('openSiteBtn').addEventListener('click', () => chrome.tabs.create({ url: SITE_URL }));
+chrome.storage.local.get(['vvScope', 'vvCloudOptIn'], data => { scope = data.vvScope === 'site' ? 'site' : 'global'; el('cloudOptIn').checked = data.vvCloudOptIn === true; void send({ type: 'GET_STATE' }).then(state => { render(state); if (state) status('Ready. Settings save on this device.'); }); });

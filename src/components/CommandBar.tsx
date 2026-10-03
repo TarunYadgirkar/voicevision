@@ -8,6 +8,7 @@ interface Props {
   onSubmit: (transcript: string) => void;
   onReset: () => void;
   pending: boolean;
+  cancellationRevision: number;
   error: string;
   entries: CommandEntry[];
 }
@@ -17,21 +18,17 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return Boolean(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable));
 }
 
-export function CommandBar({ onSubmit, onReset, pending, error, entries }: Props) {
+export function CommandBar({ onSubmit, pending, error, entries, cancellationRevision }: Props) {
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const micRef = useRef<HTMLButtonElement>(null);
 
   const handleShortcut = useCallback((event: KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      onReset();
-      return;
-    }
-    if (event.key === '/' && !isTypingTarget(event.target)) {
+    if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !isTypingTarget(event.target)) {
       event.preventDefault();
       inputRef.current?.focus();
     }
-  }, [onReset]);
+  }, []);
 
   useEffect(() => {
     window.addEventListener('keydown', handleShortcut);
@@ -49,14 +46,15 @@ export function CommandBar({ onSubmit, onReset, pending, error, entries }: Props
 
   return (
     <div className="space-y-3">
-      <form onSubmit={submitDraft} className="flex items-center gap-2.5">
-        <VoiceButton onSubmit={onSubmit} pending={pending} buttonRef={micRef} />
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-full border border-line bg-raised pl-4 pr-1.5 py-1.5 focus-within:ring-2 focus-within:ring-accent">
+      <form onSubmit={submitDraft} className="flex flex-wrap items-center gap-2.5">
+        <VoiceButton onSubmit={onSubmit} pending={pending} cancellationRevision={cancellationRevision} buttonRef={micRef} />
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-full border border-line bg-raised min-w-[12rem] pl-4 pr-1.5 py-1.5 focus-within:ring-2 focus-within:ring-accent">
           <input
             ref={inputRef}
             value={draft}
             onChange={e => setDraft(e.target.value)}
-            placeholder="Type how you see, such as I have deuteranopia"
+            placeholder="Try larger text or less glare"
+            maxLength={300}
             aria-label="Type a command"
             className="min-w-0 flex-1 bg-transparent text-base text-text placeholder:text-faint focus:outline-none"
           />
@@ -64,7 +62,7 @@ export function CommandBar({ onSubmit, onReset, pending, error, entries }: Props
             type="submit"
             disabled={!draft.trim()}
             aria-label="Apply this command"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent
               transition-[background-color,scale] duration-150 ease-[cubic-bezier(0.2,0,0,1)]
               active:scale-96 disabled:bg-sunken disabled:text-faint"
           >
@@ -75,8 +73,7 @@ export function CommandBar({ onSubmit, onReset, pending, error, entries }: Props
 
       <p className="text-sm text-faint text-balance">
         Press <kbd className="rounded-sm bg-sunken px-1.5 py-0.5 text-text">/</kbd> to type,{' '}
-        <kbd className="rounded-sm bg-sunken px-1.5 py-0.5 text-text">Space</kbd> on the microphone to listen, and{' '}
-        <kbd className="rounded-sm bg-sunken px-1.5 py-0.5 text-text">Esc</kbd> to clear everything.
+        <kbd className="rounded-sm bg-sunken px-1.5 py-0.5 text-text">Space</kbd> on the microphone to listen. Reset is always available above.
       </p>
 
       {error && (
@@ -86,8 +83,8 @@ export function CommandBar({ onSubmit, onReset, pending, error, entries }: Props
         </p>
       )}
 
-      {latest && (
-        <div className="animate-rise rounded-md bg-surface p-3" aria-live="polite">
+      <div role="status" aria-live="polite" aria-atomic="true">{latest && (
+        <div className="animate-rise rounded-md bg-surface p-3">
           <p className="text-sm text-muted">You said &ldquo;{latest.transcript}&rdquo;</p>
           <p className="mt-1.5 flex items-start gap-2 text-sm text-text">
             {latest.source === 'device' ? (
@@ -98,12 +95,12 @@ export function CommandBar({ onSubmit, onReset, pending, error, entries }: Props
             <span>
               {latest.explanation}{' '}
               <span className="text-muted">
-                {latest.source === 'device' ? 'Applied on device.' : 'Interpreted by the model.'}
+                {latest.source === 'device' ? 'Handled on device.' : 'Interpreted by the model.'}
               </span>
             </span>
           </p>
         </div>
-      )}
+      )}</div>
     </div>
   );
 }

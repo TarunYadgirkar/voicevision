@@ -28,21 +28,21 @@ export type Adaptation = (EnumAdaptation | FlagAdaptation) & {
 // spoken-command feedback and the intensity sliders all read from here, so renaming
 // "Cataracts" is a one-line change rather than a hunt through the components.
 export const ADAPTATIONS: readonly Adaptation[] = [
-  { id: 'deuteranopia', kind: 'enum', field: 'colorMode', value: 'deuteranopia', group: 'colour', label: 'Deuteranopia', hint: 'Red and green, the common one', intensityKey: 'colorMode' },
-  { id: 'protanopia', kind: 'enum', field: 'colorMode', value: 'protanopia', group: 'colour', label: 'Protanopia', hint: 'Reds look dark', intensityKey: 'colorMode' },
-  { id: 'tritanopia', kind: 'enum', field: 'colorMode', value: 'tritanopia', group: 'colour', label: 'Tritanopia', hint: 'Blue and yellow', intensityKey: 'colorMode' },
-  { id: 'achromatopsia', kind: 'enum', field: 'colorMode', value: 'achromatopsia', group: 'colour', label: 'Achromatopsia', hint: 'No hue at all', intensityKey: 'colorMode' },
+  { id: 'deuteranopia', kind: 'enum', field: 'colorMode', value: 'deuteranopia', group: 'colour', label: 'Red–green adjustment', hint: 'Optional colour shift; compare what helps you', intensityKey: 'colorMode' },
+  { id: 'protanopia', kind: 'enum', field: 'colorMode', value: 'protanopia', group: 'colour', label: 'Red colour adjustment', hint: 'Optional colour shift for red distinctions', intensityKey: 'colorMode' },
+  { id: 'tritanopia', kind: 'enum', field: 'colorMode', value: 'tritanopia', group: 'colour', label: 'Blue–yellow adjustment', hint: 'Optional colour shift for blue and yellow distinctions', intensityKey: 'colorMode' },
+  { id: 'achromatopsia', kind: 'enum', field: 'colorMode', value: 'achromatopsia', group: 'colour', label: 'Colour-free contrast', hint: 'Adds contrast without relying on hue', intensityKey: 'colorMode' },
 
-  { id: 'zoom-center', kind: 'enum', field: 'zoom', value: 'center', group: 'field', label: 'Macular degeneration', hint: 'Dims the centre of the field', intensityKey: 'zoom' },
-  { id: 'zoom-peripheral', kind: 'enum', field: 'zoom', value: 'peripheral', group: 'field', label: 'Tunnel vision', hint: 'Dims the edges of the field', intensityKey: 'zoom' },
+  { id: 'zoom-center', kind: 'enum', field: 'zoom', value: 'center', group: 'field', label: 'Central-loss simulation', hint: 'Educational preview: hides central content', intensityKey: 'zoom' },
+  { id: 'zoom-peripheral', kind: 'enum', field: 'zoom', value: 'peripheral', group: 'field', label: 'Peripheral-loss simulation', hint: 'Educational preview: hides edge content', intensityKey: 'zoom' },
   { id: 'zoom-full', kind: 'enum', field: 'zoom', value: 'full', group: 'field', label: 'Magnify the page', hint: 'Enlarges everything and reflows', intensityKey: 'zoom' },
-  { id: 'hemianopia-left', kind: 'enum', field: 'hemianopia', value: 'left', group: 'field', label: 'Left field loss', hint: 'Masks the left half' },
-  { id: 'hemianopia-right', kind: 'enum', field: 'hemianopia', value: 'right', group: 'field', label: 'Right field loss', hint: 'Masks the right half' },
-  { id: 'blur', kind: 'flag', field: 'blur', group: 'field', label: 'Cataract clarity', hint: 'Cuts haze with contrast and light', intensityKey: 'blur' },
+  { id: 'hemianopia-left', kind: 'enum', field: 'hemianopia', value: 'left', group: 'field', label: 'Left-loss simulation', hint: 'Educational preview: hides the left half' },
+  { id: 'hemianopia-right', kind: 'enum', field: 'hemianopia', value: 'right', group: 'field', label: 'Right-loss simulation', hint: 'Educational preview: hides the right half' },
+  { id: 'blur', kind: 'flag', field: 'blur', group: 'field', label: 'Clarity boost', hint: 'Increases contrast and brightness; adjust for comfort', intensityKey: 'blur' },
 
   { id: 'darkMode', kind: 'flag', field: 'darkMode', group: 'comfort', label: 'Dark mode', hint: 'Inverts the page and dims it', intensityKey: 'darkMode' },
   { id: 'highContrast', kind: 'flag', field: 'highContrast', group: 'comfort', label: 'High contrast', hint: 'Pushes light and dark apart', intensityKey: 'highContrast' },
-  { id: 'warmTone', kind: 'flag', field: 'warmTone', group: 'comfort', label: 'Warm tone', hint: 'Takes blue out of the light', intensityKey: 'warmTone' },
+  { id: 'warmTone', kind: 'flag', field: 'warmTone', group: 'comfort', label: 'Warm tone', hint: 'Adds a warmer colour tint', intensityKey: 'warmTone' },
   { id: 'invertColors', kind: 'flag', field: 'invertColors', group: 'comfort', label: 'Invert colours', hint: 'Flips every colour outright', intensityKey: 'invertColors' },
   { id: 'dimOverlay', kind: 'flag', field: 'dimOverlay', group: 'comfort', label: 'Dim the screen', hint: 'Darkens without inverting', intensityKey: 'dimOverlay' },
   { id: 'boldText', kind: 'flag', field: 'boldText', group: 'comfort', label: 'Bold text', hint: 'Thickens every letter' },

@@ -1,32 +1,9 @@
-/**
- * VoiceVision content script. Bundled to extension/content.js by `npm run build:ext`.
- * Shares src/lib/filters.ts and src/lib/intent.ts with the web app so both consumers
- * stay in lockstep; only the SVG filter ids are namespaced (vv-) to avoid colliding
- * with ids on the host page.
- *
- * Message protocol (chrome.tabs.sendMessage → sendResponse):
- *   { type: 'GET_STATE' }                            → FilterState
- *   { type: 'APPLY_COMMAND', command }               → FilterState   (command is an AccessibilityCommand)
- *   { type: 'TOGGLE_FILTER', key }                   → FilterState   (turns one filter off)
- *   { type: 'SET_INTENSITY', key, value }            → FilterState   (key 'brightness' sets state.brightness)
- *   { type: 'vv:scope', scope: 'site' | 'global' }   → { scope, state }
- *   { type: 'vv:interpret', transcript }             → { handled: true, command, state } when the
- *                                                      local parser recognised the phrase, else
- *                                                      { handled: false } and the popup calls /api/interpret
- *
- * Port protocol (chrome.tabs.connect, name 'voicevision-mic'):
- *   popup → page: { type: 'START' } | { type: 'STOP' }
- *   page → popup: { type: 'start' } | { type: 'end' } | { type: 'result', transcript } | { type: 'error', error }
- *
- * Storage: state lives under `vvState:<origin>` in site scope and `vvState` in global scope.
- * The scope itself persists under `vvScope`. Site scope falls back to the global state the
- * first time a site is seen, so a page inherits whatever the user last set globally.
- */
 import {
   applyBoldText,
   applyDimOverlay,
   applyHemianopia,
   applyReduceMotion,
+  applyReadingPreferences,
   applyZoom,
   blendMatrixValues,
   buildFilterString,
@@ -37,7 +14,9 @@ import {
   updateColorMatrices,
 } from '@/lib/filters';
 import { parseIntent } from '@/lib/intent';
-import { AccessibilityCommand, defaultFilterState, FilterState } from '@/types';
+import { normalizeFilterState } from '@/lib/persistence';
+import { hasCommandChanges, protectAssistiveCommand, validateCommand } from '@/lib/command';
+import { AccessibilityCommand, FilterState } from '@/types';
 
 type Scope = 'site' | 'global';
 
@@ -60,13 +39,14 @@ function storageKey(scope: Scope): string {
   return scope === 'site' ? `${GLOBAL_KEY}:${location.origin}` : GLOBAL_KEY;
 }
 
-function hydrate(raw: Partial<FilterState> | undefined): FilterState {
-  if (!raw) return { ...defaultFilterState, intensities: { ...defaultFilterState.intensities } };
-  return {
-    ...defaultFilterState,
-    ...raw,
-    intensities: { ...defaultFilterState.intensities, ...(raw.intensities ?? {}) },
-  };
+function statesEqual(left: FilterState, right: FilterState): boolean {
+  return (Object.keys(left) as (keyof FilterState)[]).every(key => key === 'intensities'
+    ? (Object.keys(left.intensities) as (keyof FilterState['intensities'])[]).every(name => left.intensities[name] === right.intensities[name])
+    : left[key] === right[key]);
+}
+
+function hydrate(raw: unknown): FilterState {
+  return normalizeFilterState(raw);
 }
 
 // Chrome Blink linearRGB values, one <filter> per (deficiency type × assist mode).
@@ -89,21 +69,49 @@ function injectFilterDefs(): void {
 
 function init(): void {
   injectFilterDefs();
+  const originalFilter = document.body.style.getPropertyValue('filter');
+  const originalFilterPriority = document.body.style.getPropertyPriority('filter');
+  const computedFilter = getComputedStyle(document.body).filter;
+  const originalColorScheme = document.documentElement.style.getPropertyValue('color-scheme');
+  const originalColorSchemePriority = document.documentElement.style.getPropertyPriority('color-scheme');
+  const originalZoom = document.documentElement.style.getPropertyValue('zoom');
+  const originalZoomPriority = document.documentElement.style.getPropertyPriority('zoom');
+
+  function restorePageAppearance(): void {
+    document.body.style.setProperty('filter', originalFilter, originalFilterPriority);
+    document.documentElement.style.setProperty('color-scheme', originalColorScheme, originalColorSchemePriority);
+    document.documentElement.style.setProperty('zoom', originalZoom, originalZoomPriority);
+  }
 
   let scope: Scope = 'global';
   let state = hydrate(undefined);
+  let previousState: FilterState | null = null;
+  let revision = 0;
+  let loadRevision = 0;
+
+  function remember(): void {
+    previousState = { ...state, intensities: { ...state.intensities } };
+    revision += 1;
+  }
 
   function applyAll(): void {
     updateColorMatrices(state.intensities.colorMode, PREFIX);
     // Safari does not render CSS `filter` on <html>, so it goes on <body>; every fixed
     // overlay therefore hangs off <html>, which is not a containing block for them.
-    document.body.style.filter = buildFilterString(state, PREFIX);
-    document.documentElement.style.colorScheme = state.darkMode ? 'dark' : '';
+    const filter = buildFilterString(state, PREFIX);
+    if (filter === 'none') {
+      document.body.style.setProperty('filter', originalFilter, originalFilterPriority);
+    } else {
+      document.body.style.setProperty('filter', [computedFilter && computedFilter !== 'none' ? computedFilter : '', filter].filter(Boolean).join(' '), originalFilterPriority);
+    }
+    document.documentElement.style.setProperty('color-scheme', state.darkMode ? 'dark' : originalColorScheme, originalColorSchemePriority);
     applyZoom(state.zoom, state.intensities.zoom);
+    if (!state.zoom) document.documentElement.style.setProperty('zoom', originalZoom, originalZoomPriority);
     applyHemianopia(state.hemianopia);
     applyDimOverlay(state.dimOverlay, state.intensities.dimOverlay);
     applyBoldText(state.boldText);
     applyReduceMotion(state.reduceMotion);
+    applyReadingPreferences(state);
   }
 
   function persist(): void {
@@ -113,17 +121,25 @@ function init(): void {
   function resetAll(): void {
     state = hydrate(undefined);
     resetFilters();
+    restorePageAppearance();
+  }
+
+  function resetCommand(): void {
+    if (statesEqual(state, hydrate(undefined))) return;
+    remember();
+    resetAll();
   }
 
   function mergeCommand(cmd: AccessibilityCommand): void {
     if (cmd.reset) {
-      resetAll();
+      resetCommand();
       return;
     }
     const pick = <T,>(value: T | null | undefined, fallback: T): T =>
       value !== null && value !== undefined ? value : fallback;
+    const before = state;
     state = {
-      colorMode: pick(cmd.colorMode, state.colorMode),
+      colorMode: cmd.clear?.includes('colorMode') ? null : pick(cmd.colorMode, state.colorMode),
       colorAssist: pick(cmd.colorAssist, state.colorAssist),
       darkMode: pick(cmd.darkMode, state.darkMode),
       highContrast: pick(cmd.highContrast, state.highContrast),
@@ -131,20 +147,31 @@ function init(): void {
       warmTone: pick(cmd.warmTone, state.warmTone),
       invertColors: pick(cmd.invertColors, state.invertColors),
       blur: pick(cmd.blur, state.blur),
-      hemianopia: pick(cmd.hemianopia, state.hemianopia),
-      zoom: pick(cmd.zoom, state.zoom),
+      hemianopia: cmd.clear?.includes('hemianopia') ? null : pick(cmd.hemianopia, state.hemianopia),
+      zoom: cmd.clear?.includes('zoom') ? null : pick(cmd.zoom, state.zoom),
       dimOverlay: pick(cmd.dimOverlay, state.dimOverlay),
       boldText: pick(cmd.boldText, state.boldText),
       reduceMotion: pick(cmd.reduceMotion, state.reduceMotion),
+      textScale: pick(cmd.textScale, state.textScale),
+      lineSpacing: pick(cmd.lineSpacing, state.lineSpacing),
       intensities: cmd.intensities ? { ...state.intensities, ...cmd.intensities } : state.intensities,
     };
+    if (statesEqual(before, state)) return;
+    const next = state;
+    state = before;
+    remember();
+    state = next;
     applyAll();
   }
 
   function loadScoped(next: Scope, done?: () => void): void {
     scope = next;
+    const loading = ++loadRevision;
+    const startingRevision = revision;
     // A site with no stored preferences yet inherits the global one rather than resetting.
     chrome.storage.local.get([storageKey(next), GLOBAL_KEY], (data: Record<string, Partial<FilterState> | undefined>) => {
+      if (loading !== loadRevision || startingRevision !== revision) { done?.(); return; }
+      remember();
       state = hydrate(data[storageKey(next)] ?? data[GLOBAL_KEY]);
       applyAll();
       done?.();
@@ -159,8 +186,11 @@ function init(): void {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     const change = changes[storageKey(scope)];
-    if (!change?.newValue || JSON.stringify(change.newValue) === JSON.stringify(state)) return;
-    state = hydrate(change.newValue);
+    if (!change?.newValue) return;
+    const next = hydrate(change.newValue);
+    if (statesEqual(next, state)) return;
+    remember();
+    state = next;
     applyAll();
   });
 
@@ -170,6 +200,10 @@ function init(): void {
   chrome.runtime.onConnect.addListener(port => {
     if (port.name !== 'voicevision-mic') return;
     let recognition: SpeechRecognition | null = null;
+    let disconnected = false;
+    function post(message: object): void {
+      if (!disconnected) port.postMessage(message);
+    }
 
     port.onMessage.addListener((msg: { type: string }) => {
       if (msg.type === 'STOP') {
@@ -180,7 +214,7 @@ function init(): void {
 
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SR) {
-        port.postMessage({ type: 'error', error: 'unsupported' });
+        post({ type: 'error', error: 'unsupported' });
         return;
       }
 
@@ -189,79 +223,139 @@ function init(): void {
       recognition.interimResults = false;
       recognition.lang = 'en-US';
       recognition.maxAlternatives = 1;
-      recognition.onstart = () => port.postMessage({ type: 'start' });
-      recognition.onend = () => port.postMessage({ type: 'end' });
-      recognition.onerror = (e: SpeechRecognitionErrorEvent) => port.postMessage({ type: 'error', error: e.error });
-      recognition.onresult = e => port.postMessage({ type: 'result', transcript: e.results[0][0].transcript });
-      recognition.start();
+      recognition.onstart = () => post({ type: 'start' });
+      recognition.onend = () => post({ type: 'end' });
+      recognition.onerror = (e: SpeechRecognitionErrorEvent) => post({ type: 'error', error: e.error });
+      recognition.onresult = e => post({ type: 'result', transcript: e.results[0][0].transcript });
+      try { recognition.start(); } catch { post({ type: 'error', error: 'audio-capture' }); }
     });
 
-    port.onDisconnect.addListener(() => recognition?.stop());
+    port.onDisconnect.addListener(() => { disconnected = true; recognition?.abort(); });
   });
 
   const OFF_VALUE_IS_NULL = ['colorMode', 'zoom', 'hemianopia', 'brightness'];
 
   type Message =
     | { type: 'GET_STATE' }
-    | { type: 'APPLY_COMMAND'; command: AccessibilityCommand }
+    | { type: 'APPLY_COMMAND'; command: unknown; expectedRevision?: number; transcript?: string }
+    | { type: 'SET_READING'; key: 'textScale' | 'lineSpacing' | 'brightness'; value: number }
+    | { type: 'UNDO' }
+    | { type: 'REPLACE_STATE'; state: unknown }
     | { type: 'TOGGLE_FILTER'; key: string }
     | { type: 'SET_INTENSITY'; key: string; value: number }
     | { type: 'vv:scope'; scope: Scope }
     | { type: 'vv:interpret'; transcript: string };
 
+  type Reply = (response: unknown) => void;
+
+  function getState(_message: Extract<Message, { type: 'GET_STATE' }>, sendResponse: Reply): boolean | void {
+    sendResponse(state);
+    return;
+    }
+
+  function applyCommandMessage(message: Extract<Message, { type: 'APPLY_COMMAND' }>, sendResponse: Reply): boolean | void {
+    const command = validateCommand(message.command);
+    if (!command) { sendResponse({ error: 'Command not recognized. Use the reading controls.' }); return; }
+    if (message.expectedRevision !== undefined && message.expectedRevision !== revision) {
+      sendResponse({ error: 'Settings changed while the command was processing. Try again.' }); return;
+    }
+    const safe = protectAssistiveCommand(command, typeof message.transcript === 'string' ? message.transcript : '');
+    if (hasCommandChanges(safe)) { mergeCommand(safe); persist(); }
+    sendResponse(state);
+    return;
+    }
+
+  function undoMessage(_message: Extract<Message, { type: 'UNDO' }>, sendResponse: Reply): boolean | void {
+    if (previousState) {
+      const restored = previousState;
+      remember();
+      state = restored;
+      applyAll();
+      persist();
+    }
+    sendResponse(state);
+    return;
+    }
+
+  function replaceStateMessage(message: Extract<Message, { type: 'REPLACE_STATE' }>, sendResponse: Reply): boolean | void {
+    remember();
+    state = hydrate(message.state);
+    applyAll(); persist(); sendResponse(state); return;
+    }
+
+  function setReadingMessage(message: Extract<Message, { type: 'SET_READING' }>, sendResponse: Reply): boolean | void {
+    const bounds = { textScale: [1, 2], lineSpacing: [1.4, 2.4], brightness: [0.1, 1.5] };
+    const range = bounds[message.key];
+    if (!range || !Number.isFinite(message.value) || message.value < range[0] || message.value > range[1]) {
+      sendResponse({ error: 'Reading value outside the supported range.' }); return;
+    }
+    remember();
+    state = { ...state, [message.key]: message.value };
+    applyAll(); persist(); sendResponse(state); return;
+    }
+
+  function toggleFilterMessage(message: Extract<Message, { type: 'TOGGLE_FILTER' }>, sendResponse: Reply): boolean | void {
+    if (!['colorMode', 'zoom', 'hemianopia', 'brightness', 'darkMode', 'highContrast', 'warmTone', 'invertColors', 'blur', 'dimOverlay', 'boldText', 'reduceMotion'].includes(message.key)) {
+      sendResponse({ error: 'Unknown setting.' }); return;
+    }
+    remember();
+    const off = OFF_VALUE_IS_NULL.includes(message.key) ? null : false;
+    state = { ...state, [message.key]: off };
+    applyAll();
+    persist();
+    sendResponse(state);
+    return;
+    }
+
+  function setIntensityMessage(message: Extract<Message, { type: 'SET_INTENSITY' }>, sendResponse: Reply): boolean | void {
+    if (!Number.isFinite(message.value) || (message.key === 'brightness' ? message.value < 0.1 || message.value > 1.5 : !Object.hasOwn(state.intensities, message.key) || message.value < 0 || message.value > 1)) {
+      sendResponse({ error: 'Invalid strength value.' }); return;
+    }
+    remember();
+    state = message.key === 'brightness'
+      ? { ...state, brightness: message.value }
+      : { ...state, intensities: { ...state.intensities, [message.key]: message.value } };
+    applyAll();
+    persist();
+    sendResponse(state);
+    return;
+    }
+
+  function scopeMessage(message: Extract<Message, { type: 'vv:scope' }>, sendResponse: Reply): boolean | void {
+    if (message.scope !== 'site' && message.scope !== 'global') return;
+    chrome.storage.local.set({ [SCOPE_KEY]: message.scope });
+    loadScoped(message.scope, () => {
+      persist();
+      sendResponse({ scope: message.scope, state });
+    });
+    return true;
+    }
+
+  function interpretMessage(message: Extract<Message, { type: 'vv:interpret' }>, sendResponse: Reply): boolean | void {
+    if (typeof message.transcript !== 'string' || !message.transcript.trim() || message.transcript.length > 300) { sendResponse({ handled: false, revision }); return; }
+    const command = parseIntent(message.transcript, state);
+    if (!command) {
+      sendResponse({ handled: false, revision });
+      return;
+    }
+    const safe = protectAssistiveCommand(command, typeof message.transcript === 'string' ? message.transcript : '');
+    if (hasCommandChanges(safe)) { mergeCommand(safe); persist(); }
+    sendResponse({ handled: true, command, state });
+    return;
+    }
+
+
   chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) => {
-    if (message.type === 'GET_STATE') {
-      sendResponse(state);
-      return;
-    }
-
-    if (message.type === 'APPLY_COMMAND') {
-      mergeCommand(message.command);
-      persist();
-      sendResponse(state);
-      return;
-    }
-
-    // Turn a single active filter off (the × button in the popup).
-    if (message.type === 'TOGGLE_FILTER') {
-      const off = OFF_VALUE_IS_NULL.includes(message.key) ? null : false;
-      state = { ...state, [message.key]: off };
-      applyAll();
-      persist();
-      sendResponse(state);
-      return;
-    }
-
-    // Adjust a filter's intensity slider in the popup.
-    if (message.type === 'SET_INTENSITY') {
-      state = message.key === 'brightness'
-        ? { ...state, brightness: message.value }
-        : { ...state, intensities: { ...state.intensities, [message.key]: message.value } };
-      applyAll();
-      persist();
-      sendResponse(state);
-      return;
-    }
-
-    if (message.type === 'vv:scope') {
-      chrome.storage.local.set({ [SCOPE_KEY]: message.scope });
-      loadScoped(message.scope, () => {
-        persist();
-        sendResponse({ scope: message.scope, state });
-      });
-      return true;
-    }
-
-    if (message.type === 'vv:interpret') {
-      const command = parseIntent(message.transcript, state);
-      if (!command) {
-        sendResponse({ handled: false });
-        return;
-      }
-      mergeCommand(command);
-      persist();
-      sendResponse({ handled: true, command, state });
-      return;
+    switch (message.type) {
+      case 'GET_STATE': return getState(message, sendResponse);
+      case 'APPLY_COMMAND': return applyCommandMessage(message, sendResponse);
+      case 'UNDO': return undoMessage(message, sendResponse);
+      case 'REPLACE_STATE': return replaceStateMessage(message, sendResponse);
+      case 'SET_READING': return setReadingMessage(message, sendResponse);
+      case 'TOGGLE_FILTER': return toggleFilterMessage(message, sendResponse);
+      case 'SET_INTENSITY': return setIntensityMessage(message, sendResponse);
+      case 'vv:scope': return scopeMessage(message, sendResponse);
+      case 'vv:interpret': return interpretMessage(message, sendResponse);
     }
   });
 }

@@ -1,37 +1,25 @@
 # VoiceVision privacy
 
-## What happens to your voice
+## Voice and typed commands
 
-Speech recognition runs in your browser through the Web Speech API. VoiceVision never records
-audio, never uploads audio, and never writes audio to disk.
+VoiceVision does not record or store audio. Voice input uses your browser's Web Speech API. Depending on your browser, speech recognition may send audio to the browser provider's servers. Microphone permission belongs to the website where you use voice input. Typing and buttons work without microphone access.
 
-## What happens to the transcript
+Common typed and spoken commands are interpreted locally in the browser. VoiceVision does not send these transcripts to its API.
 
-The text of what you said stays on your device while the extension's own parser can act on it.
-Most commands ("make it dark", "high contrast", "reset") are handled there, and nothing leaves
-the browser.
+## Optional cloud interpretation
 
-When the on-device parser cannot work out what you meant, the extension sends the transcript
-text, and the list of adaptations currently switched on, to the VoiceVision API so a language
-model can interpret it. Only that text and that list are sent: no page content, no URL, no page
-title, no account or device identifier.
+Cloud interpretation is off by default. You can explicitly enable it in the popup's Voice and cloud privacy section. When enabled, unrecognized commands send command text and current display settings to the VoiceVision API and Google Gemini. No page content, URL, page title, or account identifier is included. Network requests expose ordinary connection metadata, including your IP address, to the hosting provider. Avoid personal or medical details in commands; describe the adjustment you want instead.
 
-## What the server keeps
+Turning the option off cancels a pending request and prevents its reply from changing your settings. It cannot retract data already transmitted.
 
-Nothing. The API turns the transcript into a set of display settings, returns them, and keeps no
-copy. There is no database and no analytics on the server side.
+## Retention
 
-Incoming requests are counted per IP address in memory for one minute at a time, so that a single
-client cannot exhaust the shared free-tier quota. Those counters hold no transcript text and are
-lost whenever the server instance restarts.
+VoiceVision has no transcript database or analytics. Its API does not deliberately retain command text. Hosting providers and Google may process or retain data according to their policies; VoiceVision cannot promise that those services retain nothing. The API uses short-lived in-memory IP request counters to limit abuse.
 
-## What stays on your machine
+## Local preferences
 
-Your active adaptations are saved with the browser's extension storage so a page keeps its
-settings when you reload or open it again. They stay on your device and are never uploaded.
+Display settings, your site/global preference and the cloud opt-in choice are stored in extension storage on your device. Site-specific settings use the site's origin as their storage key. These saved origins are not transmitted by VoiceVision. Transcripts are not persisted. Reset restores display defaults; cloud opt-in can be turned off separately.
 
-## Permissions
+## Permissions and limitations
 
-- `activeTab` lets the extension adjust the page you are looking at when you open the popup.
-- `storage` saves your adaptations locally.
-- Microphone access is granted per site by Chrome, and only while you are pressing the mic.
+The extension's site access allows it to adjust supported web pages. Storage saves preferences locally. Browser settings pages, extension stores and some PDF viewers cannot be adjusted. Microphone access is requested only when you start voice input. Color adjustments and reading controls are personal preferences, not diagnosis or treatment.

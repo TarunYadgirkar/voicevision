@@ -119,6 +119,53 @@
     ].filter((part) => part !== null);
     return parts.join(" ") || "none";
   }
+  var readingStyles = /* @__PURE__ */ new Map();
+  var readingObserver = null;
+  var READING_SELECTOR = "div,section,article,main,header,footer,p,li,dt,dd,blockquote,h1,h2,h3,h4,h5,h6,span,a,label,td,th,pre,code";
+  var CONTROL_SELECTOR = 'button,input,textarea,select,[role="button"],[role="slider"],[contenteditable="true"],[data-vv-controls]';
+  function restoreReadingStyles() {
+    for (const [element, original] of readingStyles) {
+      if (original.fontValue) element.style.setProperty("font-size", original.fontValue, original.fontPriority);
+      else element.style.removeProperty("font-size");
+      if (original.lineValue) element.style.setProperty("line-height", original.lineValue, original.linePriority);
+      else element.style.removeProperty("line-height");
+    }
+  }
+  function clearReadingPreferences() {
+    readingObserver?.disconnect();
+    readingObserver = null;
+    restoreReadingStyles();
+    readingStyles.clear();
+  }
+  function applyReadingPreferences(state) {
+    if (state.textScale === 1 && state.lineSpacing === 1.6) {
+      clearReadingPreferences();
+      return;
+    }
+    readingObserver?.disconnect();
+    restoreReadingStyles();
+    for (const element of readingStyles.keys()) {
+      if (!element.isConnected) readingStyles.delete(element);
+    }
+    const elements = Array.from(document.querySelectorAll(READING_SELECTOR)).filter((element) => !element.closest(CONTROL_SELECTOR)).filter((element) => !/^(DIV|SECTION|ARTICLE|MAIN|HEADER|FOOTER)$/.test(element.tagName) || Array.from(element.childNodes).some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) && !element.querySelector(CONTROL_SELECTOR));
+    for (const element of elements) {
+      if (readingStyles.has(element)) continue;
+      readingStyles.set(element, {
+        fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+        fontValue: element.style.getPropertyValue("font-size"),
+        fontPriority: element.style.getPropertyPriority("font-size"),
+        lineValue: element.style.getPropertyValue("line-height"),
+        linePriority: element.style.getPropertyPriority("line-height")
+      });
+    }
+    for (const element of elements) {
+      const original = readingStyles.get(element);
+      element.style.setProperty("font-size", `${original.fontSize * state.textScale}px`, "important");
+      element.style.setProperty("line-height", String(state.lineSpacing), "important");
+    }
+    readingObserver = new MutationObserver(() => applyReadingPreferences(state));
+    readingObserver.observe(document.body, { childList: true, subtree: true });
+  }
   function applyDimOverlay(active, intensity) {
     let overlay = document.getElementById("vv-dim-overlay");
     if (!active) {
@@ -234,6 +281,7 @@
     background:linear-gradient(${gradientDir}, black 80%, transparent 100%);"></div>`;
   }
   function resetFilters() {
+    clearReadingPreferences();
     const root = document.documentElement;
     document.body.style.filter = "none";
     root.style.colorScheme = "";
@@ -269,6 +317,8 @@
       dimOverlay: null,
       boldText: null,
       reduceMotion: null,
+      textScale: null,
+      lineSpacing: null,
       intensities: null,
       reset: false,
       explanation: ""
@@ -291,15 +341,36 @@
     { test: /\b(high )?contrast\b/, label: "contrast boost", patch: { highContrast: false } },
     { test: /\b(warm ?tone|warmth|night mode|blue light filter)\b/, label: "warm tone", patch: { warmTone: false } },
     { test: /\b(invert(ed)?( colors?)?)\b/, label: "inverted colors", patch: { invertColors: false } },
-    { test: /\b(zoom|magnification|magnifier)\b/, label: "zoom", patch: { zoom: null } },
+    { test: /\b(zoom|magnification|magnifier)\b/, label: "zoom", patch: { zoom: null, clear: ["zoom"] } },
     { test: /\b(dim(ming)?( overlay)?|the dimmer)\b/, label: "dimming", patch: { dimOverlay: false } },
     { test: /\bbold( text)?\b/, label: "bold text", patch: { boldText: false } },
     { test: /\b(reduce[d]? motion|the motion filter)\b/, label: "reduced motion", patch: { reduceMotion: false } },
-    { test: /\b(color ?blind(ness)?|deuteranopia|protanopia|tritanopia|achromatopsia|the color filter)\b/, label: "color filter", patch: { colorMode: null } },
-    { test: /\b(hemianopia|field loss|the side (mask|overlay))\b/, label: "field loss overlay", patch: { hemianopia: null } },
+    { test: /\b(color ?blind(ness)?|deuteranopia|protanopia|tritanopia|achromatopsia|the color filter)\b/, label: "color filter", patch: { colorMode: null, clear: ["colorMode"] } },
+    { test: /\b(hemianopia|field loss|the side (mask|overlay))\b/, label: "field loss overlay", patch: { hemianopia: null, clear: ["hemianopia"] } },
     { test: /\b(clarity boost|the blur filter|cataract(s)?)\b/, label: "clarity boost", patch: { blur: false } }
   ];
   var RELATIVE_RULES = [
+    { test: /\b(less glare|reduce glare|softer light)\b/, label: "softer light", patch: { brightness: 0.8, warmTone: true } },
+    {
+      test: /\b((bigger|larger|increase|enlarge) (the )?(text|font)|(?:text|font)( size)? (bigger|larger)|make (the )?(text|font) (bigger|larger))\b/,
+      label: "larger text",
+      patch: (c) => ({ textScale: Math.min(2, Number((c.textScale + STEP).toFixed(2))) })
+    },
+    {
+      test: /\b((smaller|decrease|reduce) (the )?(text|font)|(?:text|font)( size)? smaller|make (the )?(text|font) smaller)\b/,
+      label: "smaller text",
+      patch: (c) => ({ textScale: Math.max(1, Number((c.textScale - STEP).toFixed(2))) })
+    },
+    {
+      test: /\b((more|increase|wider) (line )?spacing|space (the )?lines (out|more))\b/,
+      label: "more line spacing",
+      patch: (c) => ({ lineSpacing: Math.min(2.4, Number((c.lineSpacing + STEP).toFixed(2))) })
+    },
+    {
+      test: /\b((less|reduce|decrease) (line )?spacing)\b/,
+      label: "less line spacing",
+      patch: (c) => ({ lineSpacing: Math.max(1.4, Number((c.lineSpacing - STEP).toFixed(2))) })
+    },
     {
       test: /\b(darker|make it dimmer|dim it more|too light)\b/,
       label: "darker",
@@ -329,7 +400,7 @@
       patch: (c) => c.zoom ? { intensities: { zoom: stepIntensity(c, "zoom", STEP) } } : { zoom: "full", intensities: { zoom: BASELINE_INTENSITY } }
     },
     {
-      test: /\b(zoom out|less zoom|make it smaller|smaller)\b/,
+      test: /\b(zoom out|less zoom|make it smaller)\b/,
       label: "less zoom",
       patch: (c) => ({ intensities: { zoom: stepIntensity(c, "zoom", -STEP) } })
     },
@@ -345,7 +416,7 @@
     }
   ];
   var SIMULATE_RE = /\b(simulate|simulation|preview|show me what|what (it|things|colors?) looks? like (for|to)|as a (deuteranope|protanope|tritanope) sees|deuteranope sees|demo mode)\b/;
-  var CORRECT_RE = /\b(help me see colors?|correct (my |the )?colors?|fix (my |the )?colors?|i am color ?blind|i'm color ?blind|i have color ?blindness)\b/;
+  var CORRECT_RE = /\b(help me see colors?|correct (my |the )?colors?|fix (my |the )?colors?)\b/;
   var CONDITION_RULES = [
     {
       test: /\b(red[- ]green color ?blind(ness)?|deuteranopia|deuteranomaly|deuteranope|can'?t tell red from green|confuse red and green|red and green (look the same|blend))\b/,
@@ -368,33 +439,33 @@
       patch: { colorMode: "achromatopsia" }
     },
     {
-      test: /\b(cataracts?|everything (is|looks) (blurry|foggy|hazy)|my vision is cloudy|can'?t focus)\b/,
+      test: /\b(everything (is|looks) (blurry|foggy|hazy)|my vision is cloudy|can'?t focus)\b/,
       label: "clarity boost",
       patch: { blur: true }
     },
     {
       test: /\b(macular degeneration|a ?m ?d|central vision loss|blind spot in (the )?cent(er|re))\b/,
-      label: "central field loss",
+      label: "field loss",
       patch: { zoom: "center" }
     },
     {
       test: /\b(glaucoma|tunnel vision|peripheral vision loss|can'?t see the sides|losing my side vision)\b/,
-      label: "peripheral field loss",
+      label: "field loss",
       patch: { zoom: "peripheral" }
     },
     {
-      test: /\b(low vision|need everything bigger|make (everything|things) (bigger|larger)|can'?t read small text|magnify)\b/,
+      test: /\b(need everything bigger|make (everything|things) (bigger|larger)|can'?t read small text|magnify)\b/,
       label: "magnification",
       patch: { zoom: "full" }
     },
     {
       test: /\b(hemianopia|blind on my left|lost (my )?vision on (my |the )?left|left (visual )?field is gone)\b.*\bleft\b|\bleft (side )?(hemianopia|field loss)\b|\b(blind on|lost vision on) (my |the )?left\b/,
-      label: "left field loss",
+      label: "field loss",
       patch: { hemianopia: "left" }
     },
     {
       test: /\b(right (side )?(hemianopia|field loss))\b|\b(blind on|lost vision on) (my |the )?right\b|\bright (visual )?field is gone\b/,
-      label: "right field loss",
+      label: "field loss",
       patch: { hemianopia: "right" }
     },
     {
@@ -413,7 +484,7 @@
       patch: { highContrast: true }
     },
     {
-      test: /\b(light sensitive|light sensitivity|photophobia|migraine|fluorescent lights bother me|bright lights hurt|screen gives me headaches)\b/,
+      test: /\b(light sensitive|light sensitivity|fluorescent lights bother me|bright lights hurt|screen gives me headaches)\b/,
       label: "photophobia comfort",
       patch: { dimOverlay: true, warmTone: true }
     },
@@ -428,12 +499,12 @@
       patch: { invertColors: true }
     },
     {
-      test: /\b(astigmatism|presbyopia|things look (smeared|doubled)|letters look (fuzzy|thin)|bold(er)? text)\b/,
+      test: /\b(things look (smeared|doubled)|letters look (fuzzy|thin)|bold(er)? text)\b/,
       label: "bold text",
       patch: { boldText: true }
     },
     {
-      test: /\b(motion sickness|animations make me dizzy|vestibular|autoplay videos bother me|reduce motion|moving things make me (nauseous|sick))\b/,
+      test: /\b(animations make me dizzy|autoplay videos bother me|reduce motion|moving things make me (nauseous|sick))\b/,
       label: "reduced motion",
       patch: { reduceMotion: true }
     }
@@ -456,7 +527,7 @@
     return command;
   }
   function resolveColorAssist(text) {
-    if (SIMULATE_RE.test(text)) return "simulate";
+    if (SIMULATE_RE.test(text) && !/\b(no|not|never|don'?t)\b/.test(text)) return "simulate";
     if (CORRECT_RE.test(text)) return "correct";
     return null;
   }
@@ -470,31 +541,45 @@
     const labels = [];
     for (const rule of [...RELATIVE_RULES, ...CONDITION_RULES]) {
       if (!rule.test.test(text)) continue;
-      mergePatch(command, typeof rule.patch === "function" ? rule.patch(current) : rule.patch);
+      if (typeof rule.patch !== "function" && rule.patch.colorMode && !/\b(simulate|simulation|preview|show me what|sees|color filter|color adjustment|adjust (the |my )?colors?|help me see colors?|can'?t tell|confuse|look the same|blend|looks? dark)\b/.test(text)) continue;
+      const patch = typeof rule.patch === "function" ? rule.patch(current) : rule.patch;
+      const isFieldMask = patch.zoom === "center" || patch.zoom === "peripheral" || patch.hemianopia;
+      if (isFieldMask) continue;
+      mergePatch(command, patch);
       labels.push(rule.label);
     }
     return labels;
   }
   function applyColorAssist(text, current, command) {
     const assist = resolveColorAssist(text);
-    if (!assist) return [];
+    if (!assist || assist === "simulate" && !command.colorMode && !current.colorMode) return [];
     command.colorAssist = assist;
     const labels = [];
     if (assist === "correct" && !command.colorMode && !current.colorMode) {
       command.colorMode = "deuteranopia";
       labels.push("deuteranopia");
     }
-    labels.push(assist === "correct" ? "color correction" : "deficiency preview");
+    labels.push(assist === "correct" ? "color adjustment" : "deficiency preview");
     return labels;
   }
+  var FUNCTIONAL_REQUEST_RE = /\b(larger|bigger|smaller|spacing|contrast|glare|bright|dark|dim|bold|text|letters|read small|magnify|zoom|warm|motion|moving|animations|night mode|help me see colors|can'?t tell|confuse|looks? dark|color filter|adjust|simulate|preview|show me what)\b/;
+  var CONDITION_ADVICE_RE = /\b(macular degeneration|a ?m ?d|glaucoma|tunnel vision|central vision loss|peripheral vision loss|field loss|hemianopia|cataracts?|astigmatism|presbyopia|monocular|deuteranopia|protanopia|tritanopia|achromatopsia|color ?blind(ness)?|no color vision|photophobia|migraine|low vision|blind.*(left|right)|lost.*vision.*(left|right))\b/;
   function parseIntent(transcript, current) {
     const text = normalize(transcript);
     if (!text) return null;
     if (RESET_RE.test(text)) return parseResetCommand();
     if (OFF_RE.test(text)) return parseOffCommand(text);
     const command = emptyCommand();
+    if (CONDITION_ADVICE_RE.test(text) && !FUNCTIONAL_REQUEST_RE.test(text)) {
+      command.explanation = "Settings unchanged. Choose an adjustment for your reading needs; a condition name does not determine the right settings.";
+      return command;
+    }
     const labels = [...applyRules(text, current, command), ...applyColorAssist(text, current, command)];
-    if (labels.length === 0) return null;
+    if (labels.length === 0) {
+      if (!CONDITION_ADVICE_RE.test(text)) return null;
+      command.explanation = "Settings unchanged. Blindness in one eye differs from visual-field loss. Choose text size, spacing, contrast or magnification for your reading needs; these tools do not restore vision.";
+      return command;
+    }
     command.explanation = `Applied ${labels.join(", ")}.`;
     return command;
   }
@@ -524,8 +609,127 @@
     dimOverlay: false,
     boldText: false,
     reduceMotion: false,
+    textScale: 1,
+    lineSpacing: 1.6,
     intensities: defaultIntensities
   };
+
+  // src/lib/persistence.ts
+  var STORAGE_KEY = "voicevision.state";
+  var SCHEMA_VERSION = 1;
+  function boundedNumber(value, fallback, min, max) {
+    return typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
+  }
+  function asRecord(value) {
+    return value && typeof value === "object" ? value : {};
+  }
+  function normalizeBrightness(value) {
+    return typeof value === "number" && Number.isFinite(value) ? boundedNumber(value, 1, 0.1, 1.5) : null;
+  }
+  function normalizeFilterState(value) {
+    const source = asRecord(value);
+    const state = { ...defaultFilterState, intensities: { ...defaultIntensities } };
+    const flags = [
+      "darkMode",
+      "highContrast",
+      "warmTone",
+      "invertColors",
+      "blur",
+      "dimOverlay",
+      "boldText",
+      "reduceMotion"
+    ];
+    for (const flag of flags) {
+      if (typeof source[flag] === "boolean") state[flag] = source[flag];
+    }
+    const colors = ["deuteranopia", "protanopia", "tritanopia", "achromatopsia"];
+    state.colorMode = colors.find((color) => source.colorMode === color) ?? null;
+    if (source.colorAssist === "simulate") state.colorMode = null;
+    state.zoom = source.zoom === "full" ? "full" : null;
+    state.brightness = normalizeBrightness(source.brightness);
+    state.textScale = boundedNumber(source.textScale, 1, 1, 2);
+    state.lineSpacing = boundedNumber(source.lineSpacing, 1.6, 1.4, 2.4);
+    const intensities = asRecord(source.intensities);
+    for (const key of Object.keys(defaultIntensities)) {
+      state.intensities[key] = boundedNumber(intensities[key], defaultIntensities[key], 0, 1);
+    }
+    return state;
+  }
+  var BOOT_SCRIPT = `(function(){try{
+var r=JSON.parse(localStorage.getItem(${JSON.stringify(STORAGE_KEY)})||'null');
+if(!r||r.version!==${SCHEMA_VERSION}||!r.state)return;
+if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');document.documentElement.style.colorScheme='dark';}
+}catch(e){}})();`;
+
+  // src/lib/command.ts
+  var BOOLEAN_KEYS = ["darkMode", "highContrast", "warmTone", "invertColors", "blur", "dimOverlay", "boldText", "reduceMotion"];
+  var ENUMS = {
+    colorMode: ["deuteranopia", "protanopia", "tritanopia", "achromatopsia"],
+    colorAssist: ["correct", "simulate"],
+    zoom: ["center", "peripheral", "full"],
+    hemianopia: ["left", "right"]
+  };
+  var RANGES = { brightness: [0.1, 1.5], textScale: [1, 2], lineSpacing: [1.4, 2.4] };
+  var INTENSITY_KEYS = ["colorMode", "darkMode", "highContrast", "warmTone", "invertColors", "blur", "zoom", "dimOverlay"];
+  function isRecord(value) {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+  function inRange(value, min, max) {
+    return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
+  }
+  function validFields(value) {
+    if (!BOOLEAN_KEYS.every((key) => value[key] == null || typeof value[key] === "boolean")) return false;
+    if (!Object.entries(ENUMS).every(([key, options]) => value[key] == null || options.includes(value[key]))) return false;
+    return Object.entries(RANGES).every(([key, [min, max]]) => value[key] == null || inRange(value[key], min, max));
+  }
+  function parseIntensities(value) {
+    if (value == null) return null;
+    if (!isRecord(value)) return false;
+    const result = {};
+    for (const key of INTENSITY_KEYS) {
+      const item = value[key];
+      if (item === void 0) continue;
+      if (!inRange(item, 0, 1)) return false;
+      result[key] = item;
+    }
+    return result;
+  }
+  function validClear(value) {
+    return value === void 0 || Array.isArray(value) && value.every((key) => ["zoom", "colorMode", "hemianopia"].includes(key));
+  }
+  function validateCommand(value) {
+    if (!isRecord(value) || typeof value.reset !== "boolean") return null;
+    if (!validFields(value) || !validClear(value.clear)) return null;
+    if (value.explanation !== void 0 && typeof value.explanation !== "string") return null;
+    const intensities = parseIntensities(value.intensities);
+    if (intensities === false) return null;
+    const keys = [...BOOLEAN_KEYS, ...Object.keys(ENUMS), ...Object.keys(RANGES)];
+    const fields = Object.fromEntries(keys.map((key) => [key, value[key] ?? null]));
+    return {
+      ...fields,
+      reset: value.reset,
+      intensities,
+      ...value.clear === void 0 ? {} : { clear: value.clear },
+      explanation: typeof value.explanation === "string" ? value.explanation.slice(0, 400) : "Reading settings updated."
+    };
+  }
+  function protectAssistiveCommand(command, transcript) {
+    const affirmativeColorPreview = /\b(simulate|simulation|preview|show me what)\b/i.test(transcript) && !/\b(no|not|never|don'?t)\b/i.test(transcript);
+    return {
+      ...command,
+      zoom: command.zoom === "center" || command.zoom === "peripheral" ? null : command.zoom,
+      hemianopia: null,
+      colorAssist: command.colorAssist === "simulate" && !affirmativeColorPreview ? "correct" : command.colorAssist
+    };
+  }
+  function hasCommandChanges(command) {
+    if (command.reset) return true;
+    return Object.entries(command).some(([key, value]) => {
+      if (["explanation", "reset"].includes(key) || value == null) return false;
+      if (typeof value === "object") return Object.keys(value).length > 0;
+      return true;
+    });
+  }
 
   // src/extension/content.ts
   var PREFIX = "vv-";
@@ -538,13 +742,11 @@
   function storageKey(scope) {
     return scope === "site" ? `${GLOBAL_KEY}:${location.origin}` : GLOBAL_KEY;
   }
+  function statesEqual(left, right) {
+    return Object.keys(left).every((key) => key === "intensities" ? Object.keys(left.intensities).every((name) => left.intensities[name] === right.intensities[name]) : left[key] === right[key]);
+  }
   function hydrate(raw) {
-    if (!raw) return { ...defaultFilterState, intensities: { ...defaultFilterState.intensities } };
-    return {
-      ...defaultFilterState,
-      ...raw,
-      intensities: { ...defaultFilterState.intensities, ...raw.intensities ?? {} }
-    };
+    return normalizeFilterState(raw);
   }
   function injectFilterDefs() {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -563,17 +765,43 @@
   }
   function init() {
     injectFilterDefs();
+    const originalFilter = document.body.style.getPropertyValue("filter");
+    const originalFilterPriority = document.body.style.getPropertyPriority("filter");
+    const computedFilter = getComputedStyle(document.body).filter;
+    const originalColorScheme = document.documentElement.style.getPropertyValue("color-scheme");
+    const originalColorSchemePriority = document.documentElement.style.getPropertyPriority("color-scheme");
+    const originalZoom = document.documentElement.style.getPropertyValue("zoom");
+    const originalZoomPriority = document.documentElement.style.getPropertyPriority("zoom");
+    function restorePageAppearance() {
+      document.body.style.setProperty("filter", originalFilter, originalFilterPriority);
+      document.documentElement.style.setProperty("color-scheme", originalColorScheme, originalColorSchemePriority);
+      document.documentElement.style.setProperty("zoom", originalZoom, originalZoomPriority);
+    }
     let scope = "global";
     let state = hydrate(void 0);
+    let previousState = null;
+    let revision = 0;
+    let loadRevision = 0;
+    function remember() {
+      previousState = { ...state, intensities: { ...state.intensities } };
+      revision += 1;
+    }
     function applyAll() {
       updateColorMatrices(state.intensities.colorMode, PREFIX);
-      document.body.style.filter = buildFilterString(state, PREFIX);
-      document.documentElement.style.colorScheme = state.darkMode ? "dark" : "";
+      const filter = buildFilterString(state, PREFIX);
+      if (filter === "none") {
+        document.body.style.setProperty("filter", originalFilter, originalFilterPriority);
+      } else {
+        document.body.style.setProperty("filter", [computedFilter && computedFilter !== "none" ? computedFilter : "", filter].filter(Boolean).join(" "), originalFilterPriority);
+      }
+      document.documentElement.style.setProperty("color-scheme", state.darkMode ? "dark" : originalColorScheme, originalColorSchemePriority);
       applyZoom(state.zoom, state.intensities.zoom);
+      if (!state.zoom) document.documentElement.style.setProperty("zoom", originalZoom, originalZoomPriority);
       applyHemianopia(state.hemianopia);
       applyDimOverlay(state.dimOverlay, state.intensities.dimOverlay);
       applyBoldText(state.boldText);
       applyReduceMotion(state.reduceMotion);
+      applyReadingPreferences(state);
     }
     function persist() {
       chrome.storage.local.set({ [storageKey(scope)]: state });
@@ -581,15 +809,22 @@
     function resetAll() {
       state = hydrate(void 0);
       resetFilters();
+      restorePageAppearance();
+    }
+    function resetCommand() {
+      if (statesEqual(state, hydrate(void 0))) return;
+      remember();
+      resetAll();
     }
     function mergeCommand(cmd) {
       if (cmd.reset) {
-        resetAll();
+        resetCommand();
         return;
       }
       const pick = (value, fallback) => value !== null && value !== void 0 ? value : fallback;
+      const before = state;
       state = {
-        colorMode: pick(cmd.colorMode, state.colorMode),
+        colorMode: cmd.clear?.includes("colorMode") ? null : pick(cmd.colorMode, state.colorMode),
         colorAssist: pick(cmd.colorAssist, state.colorAssist),
         darkMode: pick(cmd.darkMode, state.darkMode),
         highContrast: pick(cmd.highContrast, state.highContrast),
@@ -597,18 +832,32 @@
         warmTone: pick(cmd.warmTone, state.warmTone),
         invertColors: pick(cmd.invertColors, state.invertColors),
         blur: pick(cmd.blur, state.blur),
-        hemianopia: pick(cmd.hemianopia, state.hemianopia),
-        zoom: pick(cmd.zoom, state.zoom),
+        hemianopia: cmd.clear?.includes("hemianopia") ? null : pick(cmd.hemianopia, state.hemianopia),
+        zoom: cmd.clear?.includes("zoom") ? null : pick(cmd.zoom, state.zoom),
         dimOverlay: pick(cmd.dimOverlay, state.dimOverlay),
         boldText: pick(cmd.boldText, state.boldText),
         reduceMotion: pick(cmd.reduceMotion, state.reduceMotion),
+        textScale: pick(cmd.textScale, state.textScale),
+        lineSpacing: pick(cmd.lineSpacing, state.lineSpacing),
         intensities: cmd.intensities ? { ...state.intensities, ...cmd.intensities } : state.intensities
       };
+      if (statesEqual(before, state)) return;
+      const next = state;
+      state = before;
+      remember();
+      state = next;
       applyAll();
     }
     function loadScoped(next, done) {
       scope = next;
+      const loading = ++loadRevision;
+      const startingRevision = revision;
       chrome.storage.local.get([storageKey(next), GLOBAL_KEY], (data) => {
+        if (loading !== loadRevision || startingRevision !== revision) {
+          done?.();
+          return;
+        }
+        remember();
         state = hydrate(data[storageKey(next)] ?? data[GLOBAL_KEY]);
         applyAll();
         done?.();
@@ -620,13 +869,20 @@
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       const change = changes[storageKey(scope)];
-      if (!change?.newValue || JSON.stringify(change.newValue) === JSON.stringify(state)) return;
-      state = hydrate(change.newValue);
+      if (!change?.newValue) return;
+      const next = hydrate(change.newValue);
+      if (statesEqual(next, state)) return;
+      remember();
+      state = next;
       applyAll();
     });
     chrome.runtime.onConnect.addListener((port) => {
       if (port.name !== "voicevision-mic") return;
       let recognition = null;
+      let disconnected = false;
+      function post(message) {
+        if (!disconnected) port.postMessage(message);
+      }
       port.onMessage.addListener((msg) => {
         if (msg.type === "STOP") {
           recognition?.stop();
@@ -635,7 +891,7 @@
         if (msg.type !== "START") return;
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SR) {
-          port.postMessage({ type: "error", error: "unsupported" });
+          post({ type: "error", error: "unsupported" });
           return;
         }
         recognition = new SR();
@@ -643,59 +899,149 @@
         recognition.interimResults = false;
         recognition.lang = "en-US";
         recognition.maxAlternatives = 1;
-        recognition.onstart = () => port.postMessage({ type: "start" });
-        recognition.onend = () => port.postMessage({ type: "end" });
-        recognition.onerror = (e) => port.postMessage({ type: "error", error: e.error });
-        recognition.onresult = (e) => port.postMessage({ type: "result", transcript: e.results[0][0].transcript });
-        recognition.start();
+        recognition.onstart = () => post({ type: "start" });
+        recognition.onend = () => post({ type: "end" });
+        recognition.onerror = (e) => post({ type: "error", error: e.error });
+        recognition.onresult = (e) => post({ type: "result", transcript: e.results[0][0].transcript });
+        try {
+          recognition.start();
+        } catch {
+          post({ type: "error", error: "audio-capture" });
+        }
       });
-      port.onDisconnect.addListener(() => recognition?.stop());
+      port.onDisconnect.addListener(() => {
+        disconnected = true;
+        recognition?.abort();
+      });
     });
     const OFF_VALUE_IS_NULL = ["colorMode", "zoom", "hemianopia", "brightness"];
+    function getState(_message, sendResponse) {
+      sendResponse(state);
+      return;
+    }
+    function applyCommandMessage(message, sendResponse) {
+      const command = validateCommand(message.command);
+      if (!command) {
+        sendResponse({ error: "Command not recognized. Use the reading controls." });
+        return;
+      }
+      if (message.expectedRevision !== void 0 && message.expectedRevision !== revision) {
+        sendResponse({ error: "Settings changed while the command was processing. Try again." });
+        return;
+      }
+      const safe = protectAssistiveCommand(command, typeof message.transcript === "string" ? message.transcript : "");
+      if (hasCommandChanges(safe)) {
+        mergeCommand(safe);
+        persist();
+      }
+      sendResponse(state);
+      return;
+    }
+    function undoMessage(_message, sendResponse) {
+      if (previousState) {
+        const restored = previousState;
+        remember();
+        state = restored;
+        applyAll();
+        persist();
+      }
+      sendResponse(state);
+      return;
+    }
+    function replaceStateMessage(message, sendResponse) {
+      remember();
+      state = hydrate(message.state);
+      applyAll();
+      persist();
+      sendResponse(state);
+      return;
+    }
+    function setReadingMessage(message, sendResponse) {
+      const bounds = { textScale: [1, 2], lineSpacing: [1.4, 2.4], brightness: [0.1, 1.5] };
+      const range = bounds[message.key];
+      if (!range || !Number.isFinite(message.value) || message.value < range[0] || message.value > range[1]) {
+        sendResponse({ error: "Reading value outside the supported range." });
+        return;
+      }
+      remember();
+      state = { ...state, [message.key]: message.value };
+      applyAll();
+      persist();
+      sendResponse(state);
+      return;
+    }
+    function toggleFilterMessage(message, sendResponse) {
+      if (!["colorMode", "zoom", "hemianopia", "brightness", "darkMode", "highContrast", "warmTone", "invertColors", "blur", "dimOverlay", "boldText", "reduceMotion"].includes(message.key)) {
+        sendResponse({ error: "Unknown setting." });
+        return;
+      }
+      remember();
+      const off = OFF_VALUE_IS_NULL.includes(message.key) ? null : false;
+      state = { ...state, [message.key]: off };
+      applyAll();
+      persist();
+      sendResponse(state);
+      return;
+    }
+    function setIntensityMessage(message, sendResponse) {
+      if (!Number.isFinite(message.value) || (message.key === "brightness" ? message.value < 0.1 || message.value > 1.5 : !Object.hasOwn(state.intensities, message.key) || message.value < 0 || message.value > 1)) {
+        sendResponse({ error: "Invalid strength value." });
+        return;
+      }
+      remember();
+      state = message.key === "brightness" ? { ...state, brightness: message.value } : { ...state, intensities: { ...state.intensities, [message.key]: message.value } };
+      applyAll();
+      persist();
+      sendResponse(state);
+      return;
+    }
+    function scopeMessage(message, sendResponse) {
+      if (message.scope !== "site" && message.scope !== "global") return;
+      chrome.storage.local.set({ [SCOPE_KEY]: message.scope });
+      loadScoped(message.scope, () => {
+        persist();
+        sendResponse({ scope: message.scope, state });
+      });
+      return true;
+    }
+    function interpretMessage(message, sendResponse) {
+      if (typeof message.transcript !== "string" || !message.transcript.trim() || message.transcript.length > 300) {
+        sendResponse({ handled: false, revision });
+        return;
+      }
+      const command = parseIntent(message.transcript, state);
+      if (!command) {
+        sendResponse({ handled: false, revision });
+        return;
+      }
+      const safe = protectAssistiveCommand(command, typeof message.transcript === "string" ? message.transcript : "");
+      if (hasCommandChanges(safe)) {
+        mergeCommand(safe);
+        persist();
+      }
+      sendResponse({ handled: true, command, state });
+      return;
+    }
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-      if (message.type === "GET_STATE") {
-        sendResponse(state);
-        return;
-      }
-      if (message.type === "APPLY_COMMAND") {
-        mergeCommand(message.command);
-        persist();
-        sendResponse(state);
-        return;
-      }
-      if (message.type === "TOGGLE_FILTER") {
-        const off = OFF_VALUE_IS_NULL.includes(message.key) ? null : false;
-        state = { ...state, [message.key]: off };
-        applyAll();
-        persist();
-        sendResponse(state);
-        return;
-      }
-      if (message.type === "SET_INTENSITY") {
-        state = message.key === "brightness" ? { ...state, brightness: message.value } : { ...state, intensities: { ...state.intensities, [message.key]: message.value } };
-        applyAll();
-        persist();
-        sendResponse(state);
-        return;
-      }
-      if (message.type === "vv:scope") {
-        chrome.storage.local.set({ [SCOPE_KEY]: message.scope });
-        loadScoped(message.scope, () => {
-          persist();
-          sendResponse({ scope: message.scope, state });
-        });
-        return true;
-      }
-      if (message.type === "vv:interpret") {
-        const command = parseIntent(message.transcript, state);
-        if (!command) {
-          sendResponse({ handled: false });
-          return;
-        }
-        mergeCommand(command);
-        persist();
-        sendResponse({ handled: true, command, state });
-        return;
+      switch (message.type) {
+        case "GET_STATE":
+          return getState(message, sendResponse);
+        case "APPLY_COMMAND":
+          return applyCommandMessage(message, sendResponse);
+        case "UNDO":
+          return undoMessage(message, sendResponse);
+        case "REPLACE_STATE":
+          return replaceStateMessage(message, sendResponse);
+        case "SET_READING":
+          return setReadingMessage(message, sendResponse);
+        case "TOGGLE_FILTER":
+          return toggleFilterMessage(message, sendResponse);
+        case "SET_INTENSITY":
+          return setIntensityMessage(message, sendResponse);
+        case "vv:scope":
+          return scopeMessage(message, sendResponse);
+        case "vv:interpret":
+          return interpretMessage(message, sendResponse);
       }
     });
   }

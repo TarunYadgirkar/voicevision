@@ -36,6 +36,9 @@ export interface AccessibilityCommand {
   dimOverlay: boolean | null;
   boldText: boolean | null;
   reduceMotion: boolean | null;
+  clear?: readonly ('zoom' | 'colorMode' | 'hemianopia')[];
+  textScale?: number | null;
+  lineSpacing?: number | null;
   intensities: Partial<FilterIntensities> | null;
   reset: boolean;
   explanation: string;
@@ -55,6 +58,8 @@ export interface FilterState {
   dimOverlay: boolean;
   boldText: boolean;
   reduceMotion: boolean;
+  textScale: number;
+  lineSpacing: number;
   intensities: FilterIntensities;
 }
 
@@ -72,5 +77,7 @@ export const defaultFilterState: FilterState = {
   dimOverlay: false,
   boldText: false,
   reduceMotion: false,
+  textScale: 1,
+  lineSpacing: 1.6,
   intensities: defaultIntensities,
 };

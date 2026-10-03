@@ -193,9 +193,72 @@ export function applyFilters(state: FilterState): void {
   applyDimOverlay(state.dimOverlay, state.intensities.dimOverlay);
   applyBoldText(state.boldText);
   applyReduceMotion(state.reduceMotion);
+  applyReadingPreferences(state);
 }
 
-// Photophobia/migraine: a non-inverting dark overlay that dims the page without
+interface ReadingStyle {
+  fontSize: number;
+  fontValue: string;
+  fontPriority: string;
+  lineValue: string;
+  linePriority: string;
+}
+
+const readingStyles = new Map<HTMLElement, ReadingStyle>();
+let readingObserver: MutationObserver | null = null;
+const READING_SELECTOR = 'div,section,article,main,header,footer,p,li,dt,dd,blockquote,h1,h2,h3,h4,h5,h6,span,a,label,td,th,pre,code';
+const CONTROL_SELECTOR = 'button,input,textarea,select,[role="button"],[role="slider"],[contenteditable="true"],[data-vv-controls]';
+
+function restoreReadingStyles(): void {
+  for (const [element, original] of readingStyles) {
+    if (original.fontValue) element.style.setProperty('font-size', original.fontValue, original.fontPriority);
+    else element.style.removeProperty('font-size');
+    if (original.lineValue) element.style.setProperty('line-height', original.lineValue, original.linePriority);
+    else element.style.removeProperty('line-height');
+  }
+}
+
+function clearReadingPreferences(): void {
+  readingObserver?.disconnect();
+  readingObserver = null;
+  restoreReadingStyles();
+  readingStyles.clear();
+}
+
+export function applyReadingPreferences(state: FilterState): void {
+  if (state.textScale === 1 && state.lineSpacing === 1.6) {
+    clearReadingPreferences();
+    return;
+  }
+  readingObserver?.disconnect();
+  restoreReadingStyles();
+  for (const element of readingStyles.keys()) {
+    if (!element.isConnected) readingStyles.delete(element);
+  }
+  const elements = Array.from(document.querySelectorAll<HTMLElement>(READING_SELECTOR))
+    .filter(element => !element.closest(CONTROL_SELECTOR))
+    .filter(element => !/^(DIV|SECTION|ARTICLE|MAIN|HEADER|FOOTER)$/.test(element.tagName) ||
+      (Array.from(element.childNodes).some(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) && !element.querySelector(CONTROL_SELECTOR)));
+  for (const element of elements) {
+    if (readingStyles.has(element)) continue;
+    readingStyles.set(element, {
+      fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+      fontValue: element.style.getPropertyValue('font-size'),
+      fontPriority: element.style.getPropertyPriority('font-size'),
+      lineValue: element.style.getPropertyValue('line-height'),
+      linePriority: element.style.getPropertyPriority('line-height'),
+    });
+  }
+  for (const element of elements) {
+    const original = readingStyles.get(element)!;
+    element.style.setProperty('font-size', `${original.fontSize * state.textScale}px`, 'important');
+    element.style.setProperty('line-height', String(state.lineSpacing), 'important');
+  }
+  readingObserver = new MutationObserver(() => applyReadingPreferences(state));
+  readingObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+// A non-inverting dark overlay dims the page without
 // flipping colors (unlike darkMode's invert+hue-rotate).
 export function applyDimOverlay(active: boolean, intensity: number): void {
   let overlay = document.getElementById('vv-dim-overlay');
@@ -343,6 +406,7 @@ export function applyHemianopia(side: FilterState['hemianopia']): void {
 }
 
 export function resetFilters(): void {
+  clearReadingPreferences();
   const root = document.documentElement as HTMLElement & { style: { zoom?: string } };
   document.body.style.filter = 'none';
   root.style.colorScheme = '';

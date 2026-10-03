@@ -25,7 +25,7 @@ const bricolage = Bricolage_Grotesque({
 export const metadata: Metadata = {
   title: 'VoiceVision',
   description:
-    'Say how you see and the screen adapts. VoiceVision corrects colour vision, contrast, magnification and motion on the page you are reading.',
+    'Say how you see and the screen adapts. VoiceVision offers adjustable text, spacing, colour, contrast and motion for reading comfort.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

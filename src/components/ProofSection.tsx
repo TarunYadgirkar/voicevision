@@ -24,8 +24,8 @@ function ProofPane({ type, assist, heading, note }: PaneProps) {
         scopedFilterId={`${type}-${assist}`}
         title={
           assist === 'simulate'
-            ? `The same plate under a ${TYPE_LABELS[type].toLowerCase()} simulation, where the digit is not readable`
-            : `The same plate after correction, where the digit 7 is readable`
+            ? `A coloured dot plate with digit 7 under a ${TYPE_LABELS[type].toLowerCase()} simulation`
+            : `A coloured dot plate with digit 7 after colour adjustment`
         }
         className="mx-auto w-full max-w-72"
       />
@@ -41,45 +41,33 @@ export function ProofSection() {
   const [type, setType] = useState<DichromacyType>('deuteranopia');
 
   return (
-    <section aria-labelledby="proof-heading" className="rounded-lg bg-raised p-5 sm:p-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h2 id="proof-heading" className="type-heading text-2xl sm:text-3xl">
-          What correction actually does
-        </h2>
-        <div role="radiogroup" aria-label="Colour vision deficiency" className="flex gap-1 rounded-lg bg-sunken p-1">
-          {DICHROMACY_TYPES.map(option => {
-            const selected = option === type;
-            return (
-              <button
-                key={option}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => setType(option)}
-                className={`rounded-md px-3 py-1.5 text-sm text-text transition-[background-color,box-shadow] duration-150
-                  ${selected ? 'bg-raised shadow-[var(--shadow-raised)]' : 'hover:bg-line-soft'}`}
-              >
-                {TYPE_LABELS[option]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    <details className="workspace-card">
+      <summary id="proof-heading" className="type-heading text-xl">Explore colour adjustments</summary>
+      <p className="type-body my-4 text-muted">An educational comparison of two filters. It is not a vision test, and cannot predict how an individual will see these colours.</p>
+      <fieldset className="flex flex-wrap gap-3">
+        <legend className="mb-2 font-medium">Choose a colour simulation</legend>
+        {DICHROMACY_TYPES.map(option => (
+          <label key={option} className="flex min-h-11 items-center gap-2 rounded-lg bg-surface px-3">
+            <input type="radio" name="proof-colour" value={option} checked={option === type} onChange={() => setType(option)} />
+            {TYPE_LABELS[option]}
+          </label>
+        ))}
+      </fieldset>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <ProofPane
           type={type}
           assist="simulate"
-          heading={`What a ${TYPE_LABELS[type].toLowerCase()} viewer sees`}
-          note="The two hue families land on the same colour, so the digit has nothing left to stand out with."
+          heading="Simulation"
+          note="Approximates a colour-confusion pattern. Real vision varies, and screen colours affect the result."
         />
         <ProofPane
           type={type}
           assist="correct"
-          heading="With VoiceVision correction"
-          note="Daltonization pushes the lost signal into a channel these cones still read, and the 7 comes back."
+          heading="Colour adjustment"
+          note="Redistributes colour differences. Try it on your own content and decide whether it helps."
         />
       </div>
-    </section>
+    </details>
   );
 }

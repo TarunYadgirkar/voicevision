@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
-import { applyFilters, resetFilters } from '@/lib/filters';
+import { applyFilters } from '@/lib/filters';
 import { BOOT_STYLE_ID, clearStoredState, loadState, saveState } from '@/lib/persistence';
 import { Adaptation, clearAdaptation, toggleAdaptation } from '@/lib/adaptations';
 import {
@@ -25,6 +25,8 @@ const MERGE_KEYS = [
   'dimOverlay',
   'boldText',
   'reduceMotion',
+  'textScale',
+  'lineSpacing',
 ] as const;
 
 export function mergeCommand(previous: FilterState, command: AccessibilityCommand): FilterState {
@@ -37,6 +39,7 @@ export function mergeCommand(previous: FilterState, command: AccessibilityComman
       (next as unknown as Record<string, unknown>)[key] = value;
     }
   }
+  for (const key of command.clear ?? []) next[key] = null;
   if (command.intensities) next.intensities = { ...previous.intensities, ...command.intensities };
   return next;
 }
@@ -45,6 +48,7 @@ export function mergeCommand(previous: FilterState, command: AccessibilityComman
 // localStorage without a state update inside an effect and without a hydration mismatch:
 // React hydrates from the server snapshot and re-renders from the client one.
 let current: FilterState | null = null;
+let previous: FilterState | null = null;
 const listeners = new Set<() => void>();
 
 export function getFilterState(): FilterState {
@@ -62,6 +66,12 @@ function subscribe(listener: () => void): () => void {
 }
 
 function commit(next: FilterState, persist: boolean): void {
+  const before = getFilterState();
+  if (JSON.stringify(before) === JSON.stringify(next)) {
+    if (!persist) clearStoredState();
+    return;
+  }
+  previous = before;
   current = next;
   applyFilters(next);
   if (persist) saveState(next);
@@ -77,6 +87,10 @@ export interface FilterStateApi {
   setIntensity: (key: keyof FilterIntensities, value: number) => void;
   setColorAssist: (assist: ColorAssist) => void;
   reset: () => void;
+  undo: () => void;
+  canUndo: boolean;
+  replace: (state: FilterState) => void;
+  setReading: (key: 'textScale' | 'lineSpacing' | 'brightness', value: number) => void;
 }
 
 export function useFilterState(): FilterStateApi {
@@ -90,10 +104,7 @@ export function useFilterState(): FilterStateApi {
   }, []);
 
   const reset = useCallback(() => {
-    current = defaultFilterState;
-    resetFilters();
-    clearStoredState();
-    listeners.forEach(l => l());
+    commit(defaultFilterState, false);
   }, []);
 
   const apply = useCallback((command: AccessibilityCommand) => {
@@ -121,5 +132,14 @@ export function useFilterState(): FilterStateApi {
     commit({ ...getFilterState(), colorAssist: assist }, true);
   }, []);
 
-  return { state, apply, toggle, remove, setIntensity, setColorAssist, reset };
+  const undo = useCallback(() => { if (previous) commit(previous, true); }, []);
+  const replace = useCallback((next: FilterState) => commit(next, true), []);
+  const setReading = useCallback((key: 'textScale' | 'lineSpacing' | 'brightness', value: number) => {
+    const ranges = { textScale: [1, 2], lineSpacing: [1.4, 2.4], brightness: [0.1, 1.5] };
+    if (!Number.isFinite(value)) return;
+    const [min, max] = ranges[key];
+    const safe = Math.max(min, Math.min(max, value));
+    commit({ ...getFilterState(), [key]: key === 'brightness' && safe === 1 ? null : safe }, true);
+  }, []);
+  return { state, apply, toggle, remove, setIntensity, setColorAssist, reset, undo, canUndo: previous !== null, replace, setReading };
 }

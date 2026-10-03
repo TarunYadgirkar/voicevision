@@ -31,7 +31,7 @@ export function IshiharaPlate({ type, scopedFilterId, drift = false, className =
       >
         <circle cx="500" cy="500" r="499" fill="var(--plate-bg)" />
         {dots.map((dot, i) => (
-          <circle key={i} cx={dot.x * 1000} cy={dot.y * 1000} r={dot.r * 1000} fill={dotColor(dot, palette)} />
+          <circle key={i} cx={(dot.x * 1000).toFixed(3)} cy={(dot.y * 1000).toFixed(3)} r={(dot.r * 1000).toFixed(3)} fill={dotColor(dot, palette)} />
         ))}
       </svg>
     </div>

@@ -1,40 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<title>VoiceVision</title>
-<link rel="stylesheet" href="popup.css" />
-</head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VoiceVision reading controls</title><link rel="stylesheet" href="popup.css"></head>
 <body>
-  <div class="header">
-    <h1>Voice<span>Vision</span></h1>
-    <button id="openSiteBtn" class="icon-btn" title="Open the VoiceVision website in a new tab">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M7 17 17 7M9 7h8v8" />
-      </svg>
-    </button>
-  </div>
-
-  <button id="micBtn" type="button">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <rect x="9" y="2" width="6" height="11" rx="3" />
-      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-    </svg>
-    <span id="micLabel">Speak a command</span>
-  </button>
-
-  <p id="transcript" aria-live="polite"></p>
-  <p id="explanation" aria-live="polite"></p>
-
-  <h2 class="group-title">Strength of what is on</h2>
-  <div id="filters" class="filters"><span class="empty">Nothing is on yet</span></div>
-
-  <div id="controls"></div>
-
-  <p class="hint">Or say it: "I have red-green colorblindness", "make it dark", "I'm light sensitive", "reset to normal"</p>
-
-  <script src="popup.js"></script>
-</body>
-</html>
+<header><h1>VoiceVision</h1><button id="openSiteBtn" type="button">Open app</button></header>
+<main>
+<p class="intro">Make this page easier to read. Choose what feels comfortable.</p>
+<div class="actions"><button id="undoBtn" type="button">Undo</button><button id="resetBtn" type="button">Reset all</button></div>
+<p id="explanation" role="status" aria-live="polite">Connecting to this page…</p>
+<form id="commandForm"><label for="commandInput">Type a command</label><input id="commandInput" maxlength="300" placeholder="Try “larger text”" aria-describedby="commandHint"><button type="submit">Apply command</button></form>
+<p id="commandHint" class="hint">Try “more spacing”, “less glare”, or “reset”.</p>
+<button id="micBtn" type="button" aria-pressed="false"><span id="micLabel">Speak a command</span></button>
+<p id="transcript"></p>
+<details><summary>Voice and cloud privacy</summary><p>Browser speech recognition may send audio to its provider. Typing and buttons work without a microphone.</p><label class="check-label"><input id="cloudOptIn" type="checkbox"> Allow cloud interpretation for unrecognized commands</label><p>Off by default. When enabled, command text and display settings go to VoiceVision and Google Gemini. Page content is never sent.</p></details>
+<section aria-labelledby="presetTitle"><h2 id="presetTitle">Start with your needs</h2><div class="toggle-grid"><button data-preset="reading" type="button">Larger, spaced text</button><button data-preset="glare" type="button">Less glare</button><button data-preset="contrast" type="button">Stronger contrast</button><button data-preset="calm" type="button">Less motion</button></div></section>
+<section aria-labelledby="readingTitle"><h2 id="readingTitle">Reading controls</h2><div id="filters"></div></section>
+<div id="controls"></div>
+<p class="hint">Adjustments vary by website. Use browser zoom for more magnification. These tools do not diagnose or treat eye conditions.</p>
+</main><script src="popup.js"></script>
+</body></html>

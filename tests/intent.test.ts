@@ -14,7 +14,7 @@ function parse(phrase: string, patch: Partial<FilterState> = {}) {
 
 describe('conditions and symptoms', () => {
   it('maps red-green colorblindness to deuteranopia', () => {
-    expect(parse('I have red-green colorblindness').colorMode).toBe('deuteranopia');
+    expect(parse('I have red-green colorblindness').colorMode).toBeNull();
   });
 
   it('maps a symptom description to deuteranopia', () => {
@@ -22,36 +22,36 @@ describe('conditions and symptoms', () => {
   });
 
   it('maps protanopia', () => {
-    expect(parse('I have protanopia').colorMode).toBe('protanopia');
+    expect(parse('I have protanopia').colorMode).toBeNull();
   });
 
   it('maps blue-yellow colorblindness to tritanopia', () => {
-    expect(parse('blue-yellow colorblind').colorMode).toBe('tritanopia');
+    expect(parse('blue-yellow colorblind').colorMode).toBeNull();
   });
 
   it('maps no colour vision to achromatopsia', () => {
-    expect(parse('I have no color vision at all').colorMode).toBe('achromatopsia');
+    expect(parse('I have no color vision at all').colorMode).toBeNull();
   });
 
   it('maps cataracts to the clarity boost', () => {
-    expect(parse('I have cataracts').blur).toBe(true);
+    expect(parse('I have cataracts').blur).toBeNull();
   });
 
-  it('maps macular degeneration to centre field loss', () => {
-    expect(parse('I have macular degeneration').zoom).toBe('center');
+  it('helps with macular degeneration without hiding content', () => {
+    expect(parse('I have macular degeneration').zoom).toBeNull();
   });
 
-  it('maps glaucoma to peripheral field loss', () => {
-    expect(parse('glaucoma').zoom).toBe('peripheral');
+  it('helps with glaucoma without hiding content', () => {
+    expect(parse('glaucoma').zoom).toBeNull();
   });
 
   it('maps a request for bigger text to full zoom', () => {
     expect(parse("I can't read small text").zoom).toBe('full');
   });
 
-  it('maps stroke-side vision loss to hemianopia', () => {
-    expect(parse('I lost vision on my left side').hemianopia).toBe('left');
-    expect(parse('I am blind on my right').hemianopia).toBe('right');
+  it('helps with field loss without masking content', () => {
+    expect(parse('I lost vision on my left side').hemianopia).toBeNull();
+    expect(parse('I am blind on my right').zoom).toBeNull();
   });
 
   it('maps a too-bright screen to dark mode plus reduced brightness', () => {
@@ -79,7 +79,7 @@ describe('conditions and symptoms', () => {
   });
 
   it('maps astigmatism to bold text', () => {
-    expect(parse('I have astigmatism').boldText).toBe(true);
+    expect(parse('I have astigmatism').boldText).toBeNull();
   });
 
   it('maps motion sickness to reduced motion', () => {
@@ -90,14 +90,14 @@ describe('conditions and symptoms', () => {
 describe('compound commands', () => {
   it('sets both fields for a two-condition phrase', () => {
     const command = parse('I have deuteranopia and tunnel vision');
-    expect(command.colorMode).toBe('deuteranopia');
-    expect(command.zoom).toBe('peripheral');
+    expect(command.colorMode).toBeNull();
+    expect(command.zoom).toBeNull();
   });
 
   it('combines a colour deficiency with a comfort complaint', () => {
     const command = parse("I'm colorblind and the screen is too bright");
-    expect(command.colorMode).toBe('deuteranopia');
-    expect(command.colorAssist).toBe('correct');
+    expect(command.colorMode).toBeNull();
+    expect(command.colorAssist).toBeNull();
     expect(command.darkMode).toBe(true);
   });
 
@@ -155,6 +155,15 @@ describe('negation and reset', () => {
     const command = parse('get rid of the zoom');
     expect(command.zoom).toBeNull();
     expect(command.darkMode).toBeNull();
+    expect(command.clear).toEqual(['zoom']);
+  });
+
+  it('clears a colour adjustment without resetting other preferences', () => {
+    expect(parse('remove the color filter').clear).toEqual(['colorMode']);
+  });
+
+  it('clears a field simulation without resetting other preferences', () => {
+    expect(parse('turn off the side mask').clear).toEqual(['hemianopia']);
   });
 
   it('resets everything', () => {
@@ -170,7 +179,7 @@ describe('negation and reset', () => {
 
 describe('colorAssist', () => {
   it('corrects when the person says they are colorblind', () => {
-    expect(parse('I am colorblind').colorAssist).toBe('correct');
+    expect(parse('I am colorblind').colorAssist).toBeNull();
   });
 
   it('corrects on a direct request for help with colours', () => {
@@ -202,4 +211,57 @@ describe('phrases the parser must not guess at', () => {
   ])('returns null for %s', phrase => {
     expect(parseIntent(phrase, stateWith())).toBeNull();
   });
+});
+
+ describe('reading preferences', () => {
+  it('increases text separately from zoom', () => {
+    const command = parse('make text bigger');
+    expect(command.textScale).toBe(1.2);
+    expect(command.zoom).toBeNull();
+  });
+  it('clamps text enlargement', () => {
+    expect(parse('larger text', { textScale: 1.9 }).textScale).toBe(2);
+  });
+  it('reduces text without going below baseline', () => {
+    expect(parse('smaller text').textScale).toBe(1);
+  });
+  it('increases line spacing', () => {
+    expect(parse('more line spacing').lineSpacing).toBe(1.8);
+  });
+  it('preserves explicit educational simulations', () => {
+    expect(parse('simulate macular degeneration').zoom).toBeNull();
+    expect(parse('preview glaucoma').zoom).toBeNull();
+    expect(parse('simulate left field loss').hemianopia).toBeNull();
+  });
+});
+
+describe('condition safety', () => {
+  it.each(['blind in my left eye', 'blind in my right eye', 'do not simulate glaucoma, help me read', 'no simulation please, I have macular degeneration'])('does not assume an adjustment for %s', phrase => {
+    const command = parse(phrase);
+    expect(command.zoom).toBeNull();
+    expect(command.hemianopia).toBeNull();
+    expect(command.boldText).toBeNull();
+    expect(command.highContrast).toBeNull();
+    expect(command.explanation).toMatch(/choose|settings|eye/i);
+  });
+});
+
+it.each(['protanopia', 'photophobia', 'low vision'])('does not auto-prescribe settings for %s', phrase => {
+  const command = parse(phrase);
+  expect(command.colorMode).toBeNull(); expect(command.zoom).toBeNull(); expect(command.dimOverlay).toBeNull();
+});
+it('offers less glare on device', () => {
+  expect(parse('less glare')).toMatchObject({ brightness: 0.8, warmTone: true });
+});
+it('does not enter a negated color simulation', () => {
+  expect(parse("don't simulate protanopia").colorAssist).not.toBe('simulate');
+});
+
+ it.each(['I have migraine, larger text', 'I have low vision, larger text', 'I have deuteranopia, larger text', 'I have deuteranopia, adjust to larger text'])('applies only the functional request in %s', phrase => {
+  const command = parse(phrase);
+  expect(command.textScale).toBe(1.2);
+  expect(command.warmTone).toBeNull();
+  expect(command.dimOverlay).toBeNull();
+  expect(command.zoom).toBeNull();
+  expect(command.colorMode).toBeNull();
 });
