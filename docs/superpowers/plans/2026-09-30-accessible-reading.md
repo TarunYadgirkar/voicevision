@@ -34,4 +34,4 @@ Files: src/hooks/{useCommandRunner,useFilterState,useSpeechRecognition}.ts, src/
 - [x] Add request cancellation and stale-response rejection, one-step full-state undo, optional cloud parsing, validated model output, actionable microphone errors.
 - [x] Regression tests must exercise reset/newer command against delayed response.
 - [x] Run tests, typecheck, lint, production build, extension build; review via code-reviewer, React reviewer and security reviewer.
-- [ ] Fix findings, commit meaningful segments, push, verify remote branch.
+- [x] Fix findings, commit meaningful segments, push, verify remote branch. Implementation published as812efac; runtime dependencies as6b76619.
