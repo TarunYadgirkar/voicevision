@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleName</key><string>VoiceVision</string>
+<key>CFBundleDisplayName</key><string>VoiceVision</string>
+<key>CFBundleIdentifier</key><string>com.voicevision.mac</string>
+<key>CFBundleExecutable</key><string>VoiceVision</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>0.2.0</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>LSMinimumSystemVersion</key><string>13.0</string>
+<key>NSHighResolutionCapable</key><true/>
+<key>NSMicrophoneUsageDescription</key><string>Use your microphone only when you choose Speak a command. Typing and buttons work without it.</string>
+<key>NSSpeechRecognitionUsageDescription</key><string>Recognize optional reading commands on this Mac. VoiceVision requires on-device recognition and does not send audio to a cloud service.</string>
+</dict></plist>

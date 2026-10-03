@@ -10,6 +10,11 @@ Read this and CLAUDE.md before changes. Current product supersedes hackathon PRD
 - Voice remains optional; typing/manual controls work without Gemini. Cloud parsing is off until user opts in. Browser speech may separately use its provider.
 - Undo/reset cancel pending interpretation. Never apply an obsolete response.
 
+## Mac companion
+- desktop/: Swift6 package with core settings/history/tests and native SwiftUI/AppKit app. Build with desktop/build-app.sh; test with swift test --package-path desktop.
+- No cloud, screen recording or automatic clipboard access. Only explicit selection/paste and on-device voice; secure fields rejected. Closing controls cancels capture. Save preferences, never passages; overlays disabled each launch.
+- Undo includes activation. Do not claim native UI/permissions or notarization without actual verification. See desktop/README.md.
+
 ## Architecture
 - Next.js App Router, React, TypeScript strict. Follow package-lock.json: npm.
 - src/types/index.ts: shared command and FilterState.

@@ -12,6 +12,10 @@ Adjustable reading tools for people with low vision and other access needs. Use 
 
 These are adjustable access tools, not treatment. Blindness in one eye is different from loss of half the visual field. VoiceVision does not mask half the display to “help” either condition. Condition-only commands leave settings unchanged; compound requests apply only the requested adjustment. Color shifts and warm tint are optional preferences, not proven vision correction or eye protection. See [evidence and limits](docs/EVIDENCE.md) and [software validation](docs/VALIDATION.md).
 
+## Mac app
+
+A native Mac companion now provides display-wide dimming/warm tint, a larger-text reader, local read-aloud and optional on-device voice. See [Mac setup, build and verification limits](desktop/README.md). Text reflow inside other apps is not universal; retain the browser extension for webpage adjustments. The local .app is ad-hoc signed, not notarized.
+
 ## Run locally
 
 Requires a Node version supported by Next.js 16.3.
