@@ -265,3 +265,12 @@ it('does not enter a negated color simulation', () => {
   expect(command.zoom).toBeNull();
   expect(command.colorMode).toBeNull();
 });
+
+it('wraps text on an explicit need request, without condition settings', () => {
+  const command = parse('I have glaucoma, wrap text');
+  expect(command.textWrap).toBe(true);
+  expect(command.zoom).toBeNull();
+});
+it('does not enable wrapping when negated', () => {
+  expect(parse('do not wrap text').textWrap).toBe(false);
+});

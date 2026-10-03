@@ -19,6 +19,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Bundled by `npm run build:ext` from src/extension/content.ts.
     "extension/content.js",
+    "extension-builds/**",
   ]),
 ]);
 

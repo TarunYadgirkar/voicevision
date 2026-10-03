@@ -25,6 +25,7 @@ const MERGE_KEYS = [
   'dimOverlay',
   'boldText',
   'reduceMotion',
+  'textWrap',
   'textScale',
   'lineSpacing',
 ] as const;

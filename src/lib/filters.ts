@@ -197,6 +197,7 @@ export function applyFilters(state: FilterState): void {
 }
 
 interface ReadingStyle {
+  wrapProperties: { name: string; value: string; priority: string }[];
   fontSize: number;
   fontValue: string;
   fontPriority: string;
@@ -206,11 +207,13 @@ interface ReadingStyle {
 
 const readingStyles = new Map<HTMLElement, ReadingStyle>();
 let readingObserver: MutationObserver | null = null;
-const READING_SELECTOR = 'div,section,article,main,header,footer,p,li,dt,dd,blockquote,h1,h2,h3,h4,h5,h6,span,a,label,td,th,pre,code';
-const CONTROL_SELECTOR = 'button,input,textarea,select,[role="button"],[role="slider"],[contenteditable="true"],[data-vv-controls]';
+const WRAP_PROPERTIES = ['white-space', 'overflow-wrap', 'max-width', 'min-width'];
+const READING_SELECTOR = 'input:not([type]),input[type=text],input[type=email],input[type=search],input[type=tel],input[type=url],input[type=number],textarea,[contenteditable],div,section,article,main,header,footer,p,li,dt,dd,blockquote,h1,h2,h3,h4,h5,h6,span,a,label,td,th,pre,code';
+const CONTROL_SELECTOR = 'button,input[type=password],input[type=checkbox],input[type=radio],input[type=submit],input[type=button],input[type=file],select,[role="button"],[role="slider"],[data-vv-controls]';
 
 function restoreReadingStyles(): void {
   for (const [element, original] of readingStyles) {
+    for (const property of original.wrapProperties) element.style.setProperty(property.name, property.value, property.priority);
     if (original.fontValue) element.style.setProperty('font-size', original.fontValue, original.fontPriority);
     else element.style.removeProperty('font-size');
     if (original.lineValue) element.style.setProperty('line-height', original.lineValue, original.linePriority);
@@ -225,8 +228,16 @@ function clearReadingPreferences(): void {
   readingStyles.clear();
 }
 
+function applyTextWrapping(element: HTMLElement, active: boolean): void {
+  if (!active || element.matches('input')) return;
+  element.style.setProperty('white-space', 'pre-wrap', 'important');
+  element.style.setProperty('overflow-wrap', 'anywhere', 'important');
+  element.style.setProperty('max-width', '100%', 'important');
+  element.style.setProperty('min-width', '0', 'important');
+}
+
 export function applyReadingPreferences(state: FilterState): void {
-  if (state.textScale === 1 && state.lineSpacing === 1.6) {
+  if (state.textScale === 1 && state.lineSpacing === 1.6 && !state.textWrap) {
     clearReadingPreferences();
     return;
   }
@@ -242,6 +253,7 @@ export function applyReadingPreferences(state: FilterState): void {
   for (const element of elements) {
     if (readingStyles.has(element)) continue;
     readingStyles.set(element, {
+      wrapProperties: WRAP_PROPERTIES.map(name => ({ name, value: element.style.getPropertyValue(name), priority: element.style.getPropertyPriority(name) })),
       fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
       fontValue: element.style.getPropertyValue('font-size'),
       fontPriority: element.style.getPropertyPriority('font-size'),
@@ -253,6 +265,7 @@ export function applyReadingPreferences(state: FilterState): void {
     const original = readingStyles.get(element)!;
     element.style.setProperty('font-size', `${original.fontSize * state.textScale}px`, 'important');
     element.style.setProperty('line-height', String(state.lineSpacing), 'important');
+    applyTextWrapping(element, state.textWrap);
   }
   readingObserver = new MutationObserver(() => applyReadingPreferences(state));
   readingObserver.observe(document.body, { childList: true, subtree: true });

@@ -1,9 +1,12 @@
+const extensionTabs = typeof browser !== 'undefined' ? browser.tabs : chrome.tabs;
+const LOCAL_ONLY = typeof VOICEVISION_LOCAL_ONLY !== 'undefined' && VOICEVISION_LOCAL_ONLY;
 const API_URL = 'https://voicevision-eight.vercel.app/api/interpret';
 const SITE_URL = 'https://voicevision-eight.vercel.app';
 const MAX_TRANSCRIPT_CHARS = 300;
 const el = id => document.getElementById(id);
 const micBtn = el('micBtn');
 const micLabel = el('micLabel');
+if (LOCAL_ONLY) { micBtn.disabled = true; micLabel.textContent = 'Voice unavailable in this local package — use typing'; }
 const explanationEl = el('explanation');
 const controlsEl = el('controls');
 const filtersEl = el('filters');
@@ -13,7 +16,7 @@ let activePort = null;
 let requestRevision = 0;
 let pendingController = null;
 const GROUPS = [
-  ['Display', [['darkMode', true, 'Dark mode'], ['highContrast', true, 'High contrast'], ['warmTone', true, 'Warm tone'], ['invertColors', true, 'Invert colors'], ['boldText', true, 'Bold text'], ['reduceMotion', true, 'Reduce motion'], ['dimOverlay', true, 'Dim screen']]],
+  ['Display', [['darkMode', true, 'Dark mode'], ['highContrast', true, 'High contrast'], ['warmTone', true, 'Warm tone'], ['invertColors', true, 'Invert colors'], ['textWrap', true, 'Wrap long lines'], ['boldText', true, 'Bold text'], ['reduceMotion', true, 'Reduce motion'], ['dimOverlay', true, 'Dim screen']]],
   ['Optional color adjustments', [['colorMode', 'deuteranopia', 'Deutan adjustment'], ['colorMode', 'protanopia', 'Protan adjustment'], ['colorMode', 'tritanopia', 'Tritan adjustment'], ['colorMode', 'achromatopsia', 'Contrast adjustment']]],
 ];
 const PRESETS = { reading: { textScale: 1.3, lineSpacing: 1.9, boldText: true }, glare: { brightness: 0.8, warmTone: true }, contrast: { highContrast: true, boldText: true }, calm: { reduceMotion: true } };
@@ -22,9 +25,9 @@ function invalidate() { requestRevision += 1; pendingController?.abort(); pendin
 function status(text) { explanationEl.textContent = text; }
 async function send(message) {
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await extensionTabs.query({ active: true, currentWindow: true });
     if (!tab?.id) throw new Error('No active page');
-    return await chrome.tabs.sendMessage(tab.id, message);
+    return await extensionTabs.sendMessage(tab.id, message);
   } catch {
     status('Open a regular website, then reopen VoiceVision. Browser settings, extension stores and some PDF pages cannot be adjusted.');
     return null;
@@ -62,7 +65,7 @@ filtersEl.addEventListener('change', event => {
 document.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => void manual({ type: 'APPLY_COMMAND', command: { ...PRESETS[button.dataset.preset], reset: false } })));
 el('undoBtn').addEventListener('click', () => void manual({ type: 'UNDO' }));
 el('resetBtn').addEventListener('click', () => void manual({ type: 'APPLY_COMMAND', command: { reset: true } }));
-el('cloudOptIn').addEventListener('change', () => { invalidate(); chrome.storage.local.set({ vvCloudOptIn: el('cloudOptIn').checked }); status(el('cloudOptIn').checked ? 'Cloud interpretation enabled for unrecognized commands.' : 'Cloud interpretation off. Common commands and buttons still work.'); });
+el('cloudOptIn').addEventListener('change', () => { if (LOCAL_ONLY) return; invalidate(); chrome.storage.local.set({ vvCloudOptIn: el('cloudOptIn').checked }); status(el('cloudOptIn').checked ? 'Cloud interpretation enabled for unrecognized commands.' : 'Cloud interpretation off. Common commands and buttons still work.'); });
 async function handleTranscript(rawText) {
   const text = typeof rawText === 'string' ? rawText.trim().slice(0, MAX_TRANSCRIPT_CHARS) : '';
   if (!text) { status('Enter a command first.'); return; }
@@ -74,7 +77,7 @@ async function handleTranscript(rawText) {
   const local = await send({ type: 'vv:interpret', transcript: text });
   if (revision !== requestRevision || !local) return;
   if (local.handled) { render(local.state); status(local.command.explanation || 'Applied on this device.'); return; }
-  if (!el('cloudOptIn').checked) { status('Command not recognized. Try “larger text”, “less glare”, or use the buttons. Cloud interpretation is optional in privacy settings.'); return; }
+  if (LOCAL_ONLY || !el('cloudOptIn').checked) { status('Command not recognized. Try “larger text”, “less glare”, or use the buttons. Cloud interpretation is optional in privacy settings.'); return; }
   await interpretRemotely(text, local.revision, revision);
 }
 async function interpretRemotely(text, expectedRevision, revision) {
@@ -108,10 +111,10 @@ async function startListening() {
   invalidate();
   const revision = requestRevision;
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await extensionTabs.query({ active: true, currentWindow: true });
     if (revision !== requestRevision) return;
     if (!tab?.id) { status('Open a regular website to use voice commands.'); return; }
-    const port = chrome.tabs.connect(tab.id, { name: 'voicevision-mic' });
+    const port = extensionTabs.connect(tab.id, { name: 'voicevision-mic' });
     activePort = port;
     port.onDisconnect.addListener(() => { if (activePort !== port) return; activePort = null; setMicIdle(); if (chrome.runtime.lastError) status('Voice cannot connect to this page. Open a regular website or use typing.'); });
     port.onMessage.addListener(message => {
@@ -125,5 +128,5 @@ async function startListening() {
   } catch { status('Voice cannot connect. Type a command or use the buttons.'); setMicIdle(); }
 }
 micBtn.addEventListener('click', () => { if (!activePort) return void startListening(); activePort.postMessage({ type: 'STOP' }); activePort.disconnect(); activePort = null; setMicIdle(); });
-el('openSiteBtn').addEventListener('click', () => chrome.tabs.create({ url: SITE_URL }));
-chrome.storage.local.get(['vvScope', 'vvCloudOptIn'], data => { scope = data.vvScope === 'site' ? 'site' : 'global'; el('cloudOptIn').checked = data.vvCloudOptIn === true; void send({ type: 'GET_STATE' }).then(state => { render(state); if (state) status('Ready. Settings save on this device.'); }); });
+el('openSiteBtn').addEventListener('click', () => extensionTabs.create({ url: SITE_URL }));
+chrome.storage.local.get(['vvScope', 'vvCloudOptIn'], data => { scope = data.vvScope === 'site' ? 'site' : 'global'; el('cloudOptIn').checked = !LOCAL_ONLY && data.vvCloudOptIn === true; el('cloudOptIn').disabled = LOCAL_ONLY; if (LOCAL_ONLY) el('cloudOptIn').parentElement.append(' — unavailable in this local Firefox package'); void send({ type: 'GET_STATE' }).then(state => { render(state); if (state) status('Ready. Settings save on this device.'); }); });

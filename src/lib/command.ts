@@ -1,6 +1,6 @@
 import type { AccessibilityCommand, FilterIntensities } from '@/types';
 
-const BOOLEAN_KEYS = ['darkMode', 'highContrast', 'warmTone', 'invertColors', 'blur', 'dimOverlay', 'boldText', 'reduceMotion'] as const;
+const BOOLEAN_KEYS = ['darkMode', 'highContrast', 'warmTone', 'invertColors', 'blur', 'dimOverlay', 'boldText', 'reduceMotion', 'textWrap'] as const;
 const ENUMS = {
   colorMode: ['deuteranopia', 'protanopia', 'tritanopia', 'achromatopsia'],
   colorAssist: ['correct', 'simulate'], zoom: ['center', 'peripheral', 'full'], hemianopia: ['left', 'right'],

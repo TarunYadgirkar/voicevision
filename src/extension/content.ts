@@ -152,6 +152,7 @@ function init(): void {
       dimOverlay: pick(cmd.dimOverlay, state.dimOverlay),
       boldText: pick(cmd.boldText, state.boldText),
       reduceMotion: pick(cmd.reduceMotion, state.reduceMotion),
+      textWrap: pick(cmd.textWrap, state.textWrap),
       textScale: pick(cmd.textScale, state.textScale),
       lineSpacing: pick(cmd.lineSpacing, state.lineSpacing),
       intensities: cmd.intensities ? { ...state.intensities, ...cmd.intensities } : state.intensities,
@@ -295,7 +296,7 @@ function init(): void {
     }
 
   function toggleFilterMessage(message: Extract<Message, { type: 'TOGGLE_FILTER' }>, sendResponse: Reply): boolean | void {
-    if (!['colorMode', 'zoom', 'hemianopia', 'brightness', 'darkMode', 'highContrast', 'warmTone', 'invertColors', 'blur', 'dimOverlay', 'boldText', 'reduceMotion'].includes(message.key)) {
+    if (!['colorMode', 'zoom', 'hemianopia', 'brightness', 'darkMode', 'highContrast', 'warmTone', 'invertColors', 'blur', 'dimOverlay', 'boldText', 'reduceMotion', 'textWrap'].includes(message.key)) {
       sendResponse({ error: 'Unknown setting.' }); return;
     }
     remember();

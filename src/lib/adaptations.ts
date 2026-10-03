@@ -3,7 +3,7 @@ import { FilterIntensities, FilterState } from '@/types';
 export type AdaptationGroup = 'colour' | 'field' | 'comfort';
 
 type EnumField = 'colorMode' | 'zoom' | 'hemianopia';
-type FlagField = 'darkMode' | 'highContrast' | 'warmTone' | 'invertColors' | 'blur' | 'dimOverlay' | 'boldText' | 'reduceMotion';
+type FlagField = 'darkMode' | 'highContrast' | 'warmTone' | 'invertColors' | 'blur' | 'dimOverlay' | 'boldText' | 'reduceMotion' | 'textWrap';
 
 interface EnumAdaptation {
   kind: 'enum';
@@ -46,6 +46,7 @@ export const ADAPTATIONS: readonly Adaptation[] = [
   { id: 'invertColors', kind: 'flag', field: 'invertColors', group: 'comfort', label: 'Invert colours', hint: 'Flips every colour outright', intensityKey: 'invertColors' },
   { id: 'dimOverlay', kind: 'flag', field: 'dimOverlay', group: 'comfort', label: 'Dim the screen', hint: 'Darkens without inverting', intensityKey: 'dimOverlay' },
   { id: 'boldText', kind: 'flag', field: 'boldText', group: 'comfort', label: 'Bold text', hint: 'Thickens every letter' },
+  { id: 'textWrap', kind: 'flag', field: 'textWrap', group: 'comfort', label: 'Wrap long lines', hint: 'Fit text into the available width' },
   { id: 'reduceMotion', kind: 'flag', field: 'reduceMotion', group: 'comfort', label: 'Reduce motion', hint: 'Stops animation and autoplay' },
 ] as const;
 

@@ -22,7 +22,7 @@ export function normalizeFilterState(value: unknown): FilterState {
   const source = asRecord(value);
   const state = { ...defaultFilterState, intensities: { ...defaultIntensities } };
   const flags = ['darkMode', 'highContrast', 'warmTone', 'invertColors', 'blur',
-    'dimOverlay', 'boldText', 'reduceMotion'] as const;
+    'dimOverlay', 'boldText', 'reduceMotion', 'textWrap'] as const;
   for (const flag of flags) {
     if (typeof source[flag] === 'boolean') state[flag] = source[flag];
   }

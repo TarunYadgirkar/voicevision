@@ -31,6 +31,7 @@ function emptyCommand(): AccessibilityCommand {
     dimOverlay: null,
     boldText: null,
     reduceMotion: null,
+    textWrap: null,
     textScale: null,
     lineSpacing: null,
     intensities: null,
@@ -58,6 +59,7 @@ const RESET_RE = /\b(reset|start over|go back to normal|back to normal|clear (al
 const OFF_RE = /\b(turn off|switch off|shut off|disable|remove|stop|get rid of|cancel|undo|no more)\b/;
 
 const OFF_TARGETS: ReadonlyArray<{ test: RegExp; label: string; patch: Patch }> = [
+  { test: /\b(wrap(ping)?|reflow)\b/, label: 'text wrapping', patch: { textWrap: false } },
   { test: /\bdark ?mode\b/, label: 'dark mode', patch: { darkMode: false } },
   { test: /\b(high )?contrast\b/, label: 'contrast boost', patch: { highContrast: false } },
   { test: /\b(warm ?tone|warmth|night mode|blue light filter)\b/, label: 'warm tone', patch: { warmTone: false } },
@@ -73,6 +75,7 @@ const OFF_TARGETS: ReadonlyArray<{ test: RegExp; label: string; patch: Patch }> 
 
 // Magnitude commands read the current state, so each patch is a function of it.
 const RELATIVE_RULES: ReadonlyArray<Rule> = [
+  { test: /\b(wrap (the )?(text|lines|long lines)|word wrap|reflow text)\b/, label: 'text wrapping', patch: { textWrap: true } },
   { test: /\b(less glare|reduce glare|softer light)\b/, label: 'softer light', patch: { brightness: 0.8, warmTone: true } },
   {
     test: /\b((bigger|larger|increase|enlarge) (the )?(text|font)|(?:text|font)( size)? (bigger|larger)|make (the )?(text|font) (bigger|larger))\b/,
@@ -300,7 +303,7 @@ function applyColorAssist(text: string, current: FilterState, command: Accessibi
   return labels;
 }
 
-const FUNCTIONAL_REQUEST_RE = /\b(larger|bigger|smaller|spacing|contrast|glare|bright|dark|dim|bold|text|letters|read small|magnify|zoom|warm|motion|moving|animations|night mode|help me see colors|can'?t tell|confuse|looks? dark|color filter|adjust|simulate|preview|show me what)\b/;
+const FUNCTIONAL_REQUEST_RE = /\b(wrap|wrapping|reflow|larger|bigger|smaller|spacing|contrast|glare|bright|dark|dim|bold|text|letters|read small|magnify|zoom|warm|motion|moving|animations|night mode|help me see colors|can'?t tell|confuse|looks? dark|color filter|adjust|simulate|preview|show me what)\b/;
 
 const CONDITION_ADVICE_RE = /\b(macular degeneration|a ?m ?d|glaucoma|tunnel vision|central vision loss|peripheral vision loss|field loss|hemianopia|cataracts?|astigmatism|presbyopia|monocular|deuteranopia|protanopia|tritanopia|achromatopsia|color ?blind(ness)?|no color vision|photophobia|migraine|low vision|blind.*(left|right)|lost.*vision.*(left|right))\b/;
 
@@ -308,6 +311,9 @@ export function parseIntent(transcript: string, current: FilterState): Accessibi
   const text = normalize(transcript);
   if (!text) return null;
   if (RESET_RE.test(text)) return parseResetCommand();
+  if (/\b(do not|don'?t|never|no)\b.*\b(wrap|wrapping|reflow)\b/.test(text)) {
+    return { ...emptyCommand(), textWrap: false, explanation: 'Text wrapping turned off.' };
+  }
   if (OFF_RE.test(text)) return parseOffCommand(text);
 
   const command = emptyCommand();

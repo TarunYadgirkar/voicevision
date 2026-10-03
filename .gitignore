@@ -44,3 +44,5 @@ next-env.d.ts
 /desktop/.build/
 /desktop/.swiftpm/
 /desktop/dist/
+
+/extension-builds/

@@ -2,7 +2,7 @@ export const SYSTEM_PROMPT = `You interpret requested screen reading adjustments
 Return only a JSON object. Unmentioned fields must be null. Supported fields:
 colorMode: deuteranopia|protanopia|tritanopia|achromatopsia|null;
 colorAssist: correct|simulate|null;
-darkMode, highContrast, warmTone, invertColors, blur, dimOverlay, boldText, reduceMotion: boolean|null;
+darkMode, highContrast, warmTone, invertColors, blur, dimOverlay, boldText, reduceMotion, textWrap: boolean|null;
 brightness: number 0.1–1.5|null;
 textScale: number 1–2|null; lineSpacing: number 1.4–2.4|null;
 zoom: full|center|peripheral|null; hemianopia: left|right|null;
@@ -11,6 +11,7 @@ clear: optional array of zoom|colorMode|hemianopia for switching those adjustmen
 reset: boolean; explanation: a short plain-language description of screen changes.
 
 Use the supplied currentState for relative changes. Larger text increases textScale by 0.25 bounded to 1–2.
+Wrap long lines or reflow text means textWrap true.
 More line spacing increases lineSpacing by 0.2 bounded to 1.4–2.4.
 Less glare means brightness 0.8 and optional warmTone; do not assume dark mode suits everyone.
 Clearer text means boldText and highContrast. Reduce motion means reduceMotion true.

@@ -14,3 +14,7 @@ Verified locally October 2, 2026. This records software behavior, not clinical e
 Reviews covered code correctness, React behavior and API security. Findings were fixed: diagnosis-driven compound commands, stale speech/cloud results, conditional announcements, dynamic/direct-container text, authored page appearance restoration and extension undo.
 
 Before claiming benefit for a particular condition, test reading accuracy, comprehension, task completion, fatigue and preference with affected users. See [evidence boundaries](EVIDENCE.md).
+
+## Browser expansion
+
+October2:124 tests pass after editable-text and wrapping changes. Chromium integration verifies textarea/contenteditable enlargement, intact words, long-line reflow and authored-style reset. Browser variants and Safari wrapper are prepared; Firefox and Safari live behavior remains unverified. See extension/BROWSERS.md.

@@ -16,6 +16,31 @@ afterEach(() => {
 });
 
 describe('reading styles', () => {
+  it('enlarges editable text without changing words, selection or password fields', () => {
+    document.body.innerHTML = '<textarea style="font-size:20px">Original words</textarea><input type="password" style="font-size:18px"><div contenteditable="true" style="font-size:20px">Draft</div>';
+    const editor = document.querySelector('textarea')!;
+    editor.setSelectionRange(2, 5);
+    filters.applyReadingPreferences(readingState);
+    expect(editor.style.fontSize).toBe('30px');
+    expect(editor.value).toBe('Original words');
+    expect(editor.selectionStart).toBe(2);
+    expect(document.querySelector('input')!.style.fontSize).toBe('18px');
+    expect(document.querySelector('div')!.style.fontSize).toBe('30px');
+    filters.applyReadingPreferences(defaultFilterState);
+    expect(editor.style.fontSize).toBe('20px');
+  });
+  it('wraps long lines on request and restores authored styles on reset', () => {
+    document.body.innerHTML = '<pre style="font-size:18px;white-space:pre!important;overflow-wrap:normal">Keep\nthese words</pre>';
+    const text = document.querySelector('pre')!;
+    filters.applyReadingPreferences({ ...defaultFilterState, textWrap: true });
+    expect(text.style.whiteSpace).toBe('pre-wrap');
+    expect(text.style.overflowWrap).toBe('anywhere');
+    expect(text.textContent).toBe('Keep\nthese words');
+    filters.applyReadingPreferences(defaultFilterState);
+    expect(text.style.whiteSpace).toBe('pre');
+    expect(text.style.getPropertyPriority('white-space')).toBe('important');
+    expect(text.style.overflowWrap).toBe('normal');
+  });
   it('enlarges direct container text and restores its size', () => {
     document.body.innerHTML = '<div style="font-size:20px">Direct text</div>';
     const text = document.querySelector('div')!;

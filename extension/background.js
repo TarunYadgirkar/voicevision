@@ -3,7 +3,8 @@
 chrome.commands.onCommand.addListener(async (command) => {
   if (command !== 'toggle-listening') return;
   try {
-    await chrome.action.openPopup();
+    const action = typeof browser !== 'undefined' ? browser.action : chrome.action;
+    await action.openPopup();
   } catch {
     // No focused window, or a Chrome build without openPopup — nothing useful to do here.
   }

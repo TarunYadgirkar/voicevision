@@ -65,9 +65,9 @@ export default function Home() {
         </div>
         <details id="extension-help" className="workspace-card mt-6">
           <summary className="type-heading text-xl">Use VoiceVision on other websites</summary>
-          <p className="type-body mt-4">The browser extension applies your settings to pages you visit. It is currently installed manually in desktop Chrome or Edge.</p>
+          <p className="type-body mt-4">The browser extension applies your settings to pages you visit. It is currently installed manually in Chrome, Edge or Brave. A local Firefox package and a Safari development wrapper are also available; their signing and release steps differ.</p>
           <ol className="mt-4 list-decimal space-y-3 pl-6"><li>Get the extension folder from the <a href="https://github.com/TarunYadgirkar/voicevision" className="font-medium text-accent underline underline-offset-4">VoiceVision repository</a>.</li><li>Open your browser’s Extensions page and enable Developer mode.</li><li>Choose “Load unpacked” and select the extension folder.</li><li>Open a website, then open VoiceVision from your browser toolbar. Choose whether settings apply to this site or all sites.</li></ol>
-          <p className="mt-4 text-sm text-muted">Some browser pages and protected websites cannot be changed. This workspace changes its own page; it does not change other tabs.</p>
+          <p className="mt-4 text-sm text-muted">The extension can style standard text and typing areas and optionally wrap long lines without rewriting words. Canvas editors, some PDF viewers, embedded frames and protected browser pages have limits. This workspace changes its own page; it does not change other tabs.</p>
         </details>
         <details className="workspace-card mt-6">
           <summary className="type-heading text-xl">What these tools can help with</summary>

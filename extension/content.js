@@ -121,10 +121,12 @@
   }
   var readingStyles = /* @__PURE__ */ new Map();
   var readingObserver = null;
-  var READING_SELECTOR = "div,section,article,main,header,footer,p,li,dt,dd,blockquote,h1,h2,h3,h4,h5,h6,span,a,label,td,th,pre,code";
-  var CONTROL_SELECTOR = 'button,input,textarea,select,[role="button"],[role="slider"],[contenteditable="true"],[data-vv-controls]';
+  var WRAP_PROPERTIES = ["white-space", "overflow-wrap", "max-width", "min-width"];
+  var READING_SELECTOR = "input:not([type]),input[type=text],input[type=email],input[type=search],input[type=tel],input[type=url],input[type=number],textarea,[contenteditable],div,section,article,main,header,footer,p,li,dt,dd,blockquote,h1,h2,h3,h4,h5,h6,span,a,label,td,th,pre,code";
+  var CONTROL_SELECTOR = 'button,input[type=password],input[type=checkbox],input[type=radio],input[type=submit],input[type=button],input[type=file],select,[role="button"],[role="slider"],[data-vv-controls]';
   function restoreReadingStyles() {
     for (const [element, original] of readingStyles) {
+      for (const property of original.wrapProperties) element.style.setProperty(property.name, property.value, property.priority);
       if (original.fontValue) element.style.setProperty("font-size", original.fontValue, original.fontPriority);
       else element.style.removeProperty("font-size");
       if (original.lineValue) element.style.setProperty("line-height", original.lineValue, original.linePriority);
@@ -137,8 +139,15 @@
     restoreReadingStyles();
     readingStyles.clear();
   }
+  function applyTextWrapping(element, active) {
+    if (!active || element.matches("input")) return;
+    element.style.setProperty("white-space", "pre-wrap", "important");
+    element.style.setProperty("overflow-wrap", "anywhere", "important");
+    element.style.setProperty("max-width", "100%", "important");
+    element.style.setProperty("min-width", "0", "important");
+  }
   function applyReadingPreferences(state) {
-    if (state.textScale === 1 && state.lineSpacing === 1.6) {
+    if (state.textScale === 1 && state.lineSpacing === 1.6 && !state.textWrap) {
       clearReadingPreferences();
       return;
     }
@@ -151,6 +160,7 @@
     for (const element of elements) {
       if (readingStyles.has(element)) continue;
       readingStyles.set(element, {
+        wrapProperties: WRAP_PROPERTIES.map((name) => ({ name, value: element.style.getPropertyValue(name), priority: element.style.getPropertyPriority(name) })),
         fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
         fontValue: element.style.getPropertyValue("font-size"),
         fontPriority: element.style.getPropertyPriority("font-size"),
@@ -162,6 +172,7 @@
       const original = readingStyles.get(element);
       element.style.setProperty("font-size", `${original.fontSize * state.textScale}px`, "important");
       element.style.setProperty("line-height", String(state.lineSpacing), "important");
+      applyTextWrapping(element, state.textWrap);
     }
     readingObserver = new MutationObserver(() => applyReadingPreferences(state));
     readingObserver.observe(document.body, { childList: true, subtree: true });
@@ -317,6 +328,7 @@
       dimOverlay: null,
       boldText: null,
       reduceMotion: null,
+      textWrap: null,
       textScale: null,
       lineSpacing: null,
       intensities: null,
@@ -337,6 +349,7 @@
   var RESET_RE = /\b(reset|start over|go back to normal|back to normal|clear (all|the)? ?filters?|remove all filters|turn everything off|turn it all off|normal vision|undo everything)\b/;
   var OFF_RE = /\b(turn off|switch off|shut off|disable|remove|stop|get rid of|cancel|undo|no more)\b/;
   var OFF_TARGETS = [
+    { test: /\b(wrap(ping)?|reflow)\b/, label: "text wrapping", patch: { textWrap: false } },
     { test: /\bdark ?mode\b/, label: "dark mode", patch: { darkMode: false } },
     { test: /\b(high )?contrast\b/, label: "contrast boost", patch: { highContrast: false } },
     { test: /\b(warm ?tone|warmth|night mode|blue light filter)\b/, label: "warm tone", patch: { warmTone: false } },
@@ -350,6 +363,7 @@
     { test: /\b(clarity boost|the blur filter|cataract(s)?)\b/, label: "clarity boost", patch: { blur: false } }
   ];
   var RELATIVE_RULES = [
+    { test: /\b(wrap (the )?(text|lines|long lines)|word wrap|reflow text)\b/, label: "text wrapping", patch: { textWrap: true } },
     { test: /\b(less glare|reduce glare|softer light)\b/, label: "softer light", patch: { brightness: 0.8, warmTone: true } },
     {
       test: /\b((bigger|larger|increase|enlarge) (the )?(text|font)|(?:text|font)( size)? (bigger|larger)|make (the )?(text|font) (bigger|larger))\b/,
@@ -562,12 +576,15 @@
     labels.push(assist === "correct" ? "color adjustment" : "deficiency preview");
     return labels;
   }
-  var FUNCTIONAL_REQUEST_RE = /\b(larger|bigger|smaller|spacing|contrast|glare|bright|dark|dim|bold|text|letters|read small|magnify|zoom|warm|motion|moving|animations|night mode|help me see colors|can'?t tell|confuse|looks? dark|color filter|adjust|simulate|preview|show me what)\b/;
+  var FUNCTIONAL_REQUEST_RE = /\b(wrap|wrapping|reflow|larger|bigger|smaller|spacing|contrast|glare|bright|dark|dim|bold|text|letters|read small|magnify|zoom|warm|motion|moving|animations|night mode|help me see colors|can'?t tell|confuse|looks? dark|color filter|adjust|simulate|preview|show me what)\b/;
   var CONDITION_ADVICE_RE = /\b(macular degeneration|a ?m ?d|glaucoma|tunnel vision|central vision loss|peripheral vision loss|field loss|hemianopia|cataracts?|astigmatism|presbyopia|monocular|deuteranopia|protanopia|tritanopia|achromatopsia|color ?blind(ness)?|no color vision|photophobia|migraine|low vision|blind.*(left|right)|lost.*vision.*(left|right))\b/;
   function parseIntent(transcript, current) {
     const text = normalize(transcript);
     if (!text) return null;
     if (RESET_RE.test(text)) return parseResetCommand();
+    if (/\b(do not|don'?t|never|no)\b.*\b(wrap|wrapping|reflow)\b/.test(text)) {
+      return { ...emptyCommand(), textWrap: false, explanation: "Text wrapping turned off." };
+    }
     if (OFF_RE.test(text)) return parseOffCommand(text);
     const command = emptyCommand();
     if (CONDITION_ADVICE_RE.test(text) && !FUNCTIONAL_REQUEST_RE.test(text)) {
@@ -609,6 +626,7 @@
     dimOverlay: false,
     boldText: false,
     reduceMotion: false,
+    textWrap: false,
     textScale: 1,
     lineSpacing: 1.6,
     intensities: defaultIntensities
@@ -637,7 +655,8 @@
       "blur",
       "dimOverlay",
       "boldText",
-      "reduceMotion"
+      "reduceMotion",
+      "textWrap"
     ];
     for (const flag of flags) {
       if (typeof source[flag] === "boolean") state[flag] = source[flag];
@@ -662,7 +681,7 @@ if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');do
 }catch(e){}})();`;
 
   // src/lib/command.ts
-  var BOOLEAN_KEYS = ["darkMode", "highContrast", "warmTone", "invertColors", "blur", "dimOverlay", "boldText", "reduceMotion"];
+  var BOOLEAN_KEYS = ["darkMode", "highContrast", "warmTone", "invertColors", "blur", "dimOverlay", "boldText", "reduceMotion", "textWrap"];
   var ENUMS = {
     colorMode: ["deuteranopia", "protanopia", "tritanopia", "achromatopsia"],
     colorAssist: ["correct", "simulate"],
@@ -837,6 +856,7 @@ if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');do
         dimOverlay: pick(cmd.dimOverlay, state.dimOverlay),
         boldText: pick(cmd.boldText, state.boldText),
         reduceMotion: pick(cmd.reduceMotion, state.reduceMotion),
+        textWrap: pick(cmd.textWrap, state.textWrap),
         textScale: pick(cmd.textScale, state.textScale),
         lineSpacing: pick(cmd.lineSpacing, state.lineSpacing),
         intensities: cmd.intensities ? { ...state.intensities, ...cmd.intensities } : state.intensities
@@ -971,7 +991,7 @@ if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');do
       return;
     }
     function toggleFilterMessage(message, sendResponse) {
-      if (!["colorMode", "zoom", "hemianopia", "brightness", "darkMode", "highContrast", "warmTone", "invertColors", "blur", "dimOverlay", "boldText", "reduceMotion"].includes(message.key)) {
+      if (!["colorMode", "zoom", "hemianopia", "brightness", "darkMode", "highContrast", "warmTone", "invertColors", "blur", "dimOverlay", "boldText", "reduceMotion", "textWrap"].includes(message.key)) {
         sendResponse({ error: "Unknown setting." });
         return;
       }

@@ -4,7 +4,7 @@ Adjustable reading tools for people with low vision and other access needs. Use 
 
 ## What works
 
-- Text size (100–200%), line spacing, brightness, optional contrast, color and motion adjustments.
+- Text size (100–200%), line spacing, optional long-line wrapping, brightness, contrast, color and motion adjustments. Standard typing areas are included without changing their words.
 - Need-based starting points, a personal reading preview, saved preferences, undo and reset.
 - Keyboard controls and native radio groups; microphone errors explain typing/manual alternatives.
 - Chrome/Edge extension applies the shared engine to ordinary webpages, with settings per site or globally.
@@ -36,6 +36,8 @@ npm run build:ext
 ```
 
 ## Install extension
+
+[Browser packages and limits](extension/BROWSERS.md): Chromium package for Chrome/Edge/Brave; local Firefox package; prepared Safari wrapper. Build all variants with `npm run build:ext:browsers`. Firefox/Safari signing and live verification remain separate.
 
 1. Build with `npm run build:ext`.
 2. Open `chrome://extensions` or Edge's Extensions page.

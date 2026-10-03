@@ -1,3 +1,4 @@
+import { normalizeFilterState } from '@/lib/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as persistence from '@/lib/persistence';
 import { defaultFilterState } from '@/types';
@@ -35,4 +36,9 @@ describe('restored preferences', () => {
     new Function(persistence.BOOT_SCRIPT)();
     expect(appendChild).not.toHaveBeenCalled();
   });
+});
+
+it('restores only a boolean wrapping preference', () => {
+  expect(normalizeFilterState({ textWrap: true }).textWrap).toBe(true);
+  expect(normalizeFilterState({ textWrap: 'true' }).textWrap).toBe(false);
 });

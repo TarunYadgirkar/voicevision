@@ -69,3 +69,11 @@ it('ignores own storage echoes with reordered object keys', () => {
   send({ type: 'UNDO' });
   expect(document.querySelector('p')!.style.fontSize).toBe('20px');
 });
+
+it('toggles wrapping off and restores authored whitespace', () => {
+  document.body.innerHTML = '<pre style="white-space:pre">Original</pre>';
+  send({ type: 'APPLY_COMMAND', command: { reset: false, textWrap: true } });
+  expect(document.querySelector('pre')!.style.whiteSpace).toBe('pre-wrap');
+  send({ type: 'TOGGLE_FILTER', key: 'textWrap' });
+  expect(document.querySelector('pre')!.style.whiteSpace).toBe('pre');
+});
