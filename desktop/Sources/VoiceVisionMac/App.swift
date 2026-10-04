@@ -12,6 +12,8 @@ final class AppModel: ObservableObject {
     let speech = LocalSpeech()
     private let overlays = DisplayOverlays()
     private let speaker = AVSpeechSynthesizer()
+    @Published var editing = false
+    var voices: [AVSpeechSynthesisVoice] { AVSpeechSynthesisVoice.speechVoices().sorted { $0.name < $1.name } }
     init() {
         var settings = VoiceVisionCore.Settings()
         if let data = UserDefaults.standard.data(forKey: "readingPreferences"), let stored = try? JSONDecoder().decode(VoiceVisionCore.Settings.self, from: data) { settings = stored; settings.normalize(); settings.screenEnabled = false }
@@ -35,9 +37,9 @@ final class AppModel: ObservableObject {
         if ["reset", "reset all", "back to normal"].contains(text) { reset(); return }
         var next = history.current
         switch next.apply(String(text.prefix(300))) {
-        case .changed: if next.dim != history.current.dim || next.warmth != history.current.warmth { next.screenEnabled = true }; history.change { $0 = next }; update(); status = "Requested preferences applied. Reader text size applies inside VoiceVision."
-        case .unchanged: status = "Settings unchanged. Choose adjustments by need; a condition does not choose settings."
-        case .unknown: status = "Try larger text, more spacing, less glare, warm tint, undo or reset."
+        case .changed: if next.dim != history.current.dim || next.warmth != history.current.warmth { next.screenEnabled = true }; history.change { $0 = next }; update(); status = "Requested preferences applied. Appearance and speech settings apply in the reader; dimming and tint apply across displays."
+        case .unchanged: status = "Settings unchanged. Use the controls to turn an adjustment off. Conditions alone do not choose settings."
+        case .unknown: status = "Try dark mode, bold text, high contrast, larger text, more letter spacing, narrower lines, slower speech, less glare, undo or reset."
         }
     }
     func paste() {
@@ -51,9 +53,14 @@ final class AppModel: ObservableObject {
     func readAloud() {
         speaker.stopSpeaking(at: .immediate)
         let utterance = AVSpeechUtterance(string: String(text.prefix(100_000)))
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        utterance.rate = Float(history.current.speechRate)
+        if !history.current.voiceIdentifier.isEmpty { utterance.voice = AVSpeechSynthesisVoice(identifier: history.current.voiceIdentifier) }
         speaker.speak(utterance); status = "Reading aloud using macOS speech. Stop is available."
     }
+    func pauseReading() { if speaker.pauseSpeaking(at: .word) { status = "Reading paused. Resume is available." } }
+    func resumeReading() { if speaker.continueSpeaking() { status = "Reading resumed." } }
+    func copyText() { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string); status = "Reader text copied." }
+    func openWeb() { if let url = URL(string: "https://voicevision-eight.vercel.app/") { NSWorkspace.shared.open(url) } }
     func stopReading() { speaker.stopSpeaking(at: .immediate); status = "Read-aloud stopped." }
     func settings(_ anchor: String) {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.universalaccess?\(anchor)") else { return }
@@ -67,7 +74,7 @@ struct VoiceVisionApp: App {
     var body: some Scene {
         WindowGroup("VoiceVision", id: "controls") {
             Controls(model: model).frame(minWidth: 460, minHeight: 640)
-        }.defaultSize(width: 520, height: 760)
+        }.defaultSize(width: 650, height: 900)
         WindowGroup("VoiceVision Reader", id: "reader") {
             Reader(model: model).frame(minWidth: 400, minHeight: 360)
         }.defaultSize(width: 740, height: 700)
@@ -112,17 +119,26 @@ struct Controls: View {
                         Text("Colour and dimming are optional preferences, not eye protection. Your mouse still reaches apps underneath.").font(.callout).foregroundStyle(.secondary)
                     }.padding(8)
                 }
-                GroupBox("Reader") {
-                    VStack(alignment: .leading, spacing: 14) {
-                        adjustment("Reader text size", key: \.textSize, range: 16...48, step: 2)
-                        adjustment("Reader line spacing", key: \.spacing, range: 0...24, step: 2)
-                        Button("Open reader") { openWindow(id: "reader") }
-                        Button("Paste from clipboard and open reader") { model.paste(); openWindow(id: "reader") }
-                        Text("To read a selection from another app, select text there and choose Read selected text from the VoiceVision menu bar. Some apps do not share selected text.").font(.callout).foregroundStyle(.secondary)
+                GroupBox("Start with your needs") {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 160))], alignment: .leading) {
+                        Button("Larger, spaced text") { model.change { $0.applyPreset(.reading) } }
+                        Button("Less glare") { model.change { $0.applyPreset(.glare) } }
+                        Button("Stronger contrast") { model.change { $0.applyPreset(.contrast) } }
                     }.padding(8)
                 }
+                GroupBox("Reader appearance") {
+                    ReaderPreferences(model: model).padding(8)
+                }
+                GroupBox("Try your settings") {
+                    ReaderPassage(model: model).frame(height: 180)
+                }
                 HStack {
-                    TextField("Try larger text or less glare", text: $command).onSubmit(submit)
+                    Button("Open reader") { openWindow(id: "reader") }
+                    Button("Paste and open reader") { model.paste(); openWindow(id: "reader") }
+                }
+                Text("Select text in another app, then choose Read selected text from the eye icon in the menu bar. You can also paste, edit and copy text in the reader.").font(.callout).foregroundStyle(.secondary)
+                HStack {
+                    TextField("Try dark mode, bold text or less glare", text: $command).onSubmit(submit)
                     Button("Apply", action: submit)
                 }
                 VoiceControl(model: model, speech: model.speech)
@@ -130,7 +146,9 @@ struct Controls: View {
                 GroupBox("macOS accessibility") {
                     VStack(alignment: .leading, spacing: 10) {
                         Button("Open system Zoom settings") { model.settings("Seeing_Zoom") }
-                        Button("Open system Display settings") { model.settings("Seeing_Display") }
+                        Button("Open contrast, invert colours and motion settings") { model.settings("Seeing_Display") }
+                        Button("Open spoken content settings") { model.settings("Seeing_Speech") }
+                        Button("Open VoiceVision website") { model.openWeb() }
                         Text("macOS provides magnification and display accessibility. Opening settings does not enable them. Reader text changes apply inside VoiceVision; the browser extension can also reflow website text.").font(.callout).foregroundStyle(.secondary)
                     }.padding(8)
                 }
@@ -165,20 +183,43 @@ struct VoiceControl: View {
 
 struct Reader: View {
     @ObservedObject var model: AppModel
+    @State private var showPreferences = true
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Button("Paste from clipboard") { model.paste() }
-                Button("Larger text") { model.change { $0.textSize += 4 } }
-                Button("Smaller text") { model.change { $0.textSize -= 4 } }
-                Button("Read aloud") { model.readAloud() }
-                Button("Stop reading") { model.stopReading() }
+        VStack(alignment: .leading, spacing: 14) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 110))], alignment: .leading) {
+                Button("Paste") { model.paste() }.keyboardShortcut("v", modifiers: [.command, .shift])
+                Button("Copy text") { model.copyText() }
+                Toggle("Edit text", isOn: $model.editing).toggleStyle(.button)
+                Button("Appearance") { showPreferences.toggle() }
+                Button("Undo") { model.undo() }.disabled(model.history.previous == nil)
+                Button("Reset") { model.reset() }
             }
-            ScrollView {
-                Text(model.text).font(.system(size: model.history.current.textSize))
-                    .lineSpacing(model.history.current.spacing).textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading).padding(24)
-            }.background(Color(nsColor: .textBackgroundColor)).clipShape(RoundedRectangle(cornerRadius: 12))
+            if showPreferences {
+                DisclosureGroup("Reader appearance") { ReaderPreferences(model: model).padding(.top, 10) }
+            }
+            if model.editing {
+                TextEditor(text: $model.text).font(.system(size: model.history.current.textSize))
+                    .accessibilityLabel("Edit reader text")
+                    .onChange(of: model.text) { value in if value.count > 100_000 { model.text = String(value.prefix(100_000)) } }
+                Text("Finish editing to see your appearance settings. Changes stay here until you copy the text.").font(.caption)
+            } else {
+                ReaderPassage(model: model)
+            }
+            HStack {
+                Button("Read aloud") { model.readAloud() }
+                Button("Pause") { model.pauseReading() }
+                Button("Resume") { model.resumeReading() }
+                Button("Stop") { model.stopReading() }
+            }
+            VStack(alignment: .leading) {
+                Text("Speech speed")
+                Slider(value: Binding(get: { model.history.current.speechRate }, set: { value in model.change { $0.speechRate = value } }), in: 0.2...0.65, step: 0.05) { Text("Speech speed") }
+                Picker("Voice", selection: Binding(get: { model.history.current.voiceIdentifier }, set: { value in model.change { $0.voiceIdentifier = value } })) {
+                    Text("System default").tag("")
+                    ForEach(model.voices, id: \.identifier) { voice in Text("\(voice.name) (\(voice.language))").tag(voice.identifier) }
+                }
+            }
+            Text("Speech speed and voice apply when you start reading again.").font(.caption).foregroundStyle(.secondary)
             Text(model.status).font(.callout).foregroundStyle(.secondary).accessibilityAddTraits(.updatesFrequently)
         }.padding(24)
     }
