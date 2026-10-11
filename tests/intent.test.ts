@@ -274,3 +274,34 @@ it('wraps text on an explicit need request, without condition settings', () => {
 it('does not enable wrapping when negated', () => {
   expect(parse('do not wrap text').textWrap).toBe(false);
 });
+
+describe('plain descriptions of a reading problem', () => {
+  it('reads "the text is too small" as larger text', () => {
+    expect(parse('The text is too small').textScale).toBe(1.2);
+  });
+
+  it('reads cramped lines as more line spacing', () => {
+    expect(parse('Lines feel cramped').lineSpacing).toBe(1.8);
+  });
+
+  it('reads too much glare as softer light without dark mode', () => {
+    const command = parse("There's too much glare");
+    expect(command.brightness).toBe(0.8);
+    expect(command.warmTone).toBe(true);
+    expect(command.darkMode).toBeNull();
+  });
+
+  it('reads clearer words as bold text with contrast', () => {
+    const command = parse('Make the words clearer');
+    expect(command.boldText).toBe(true);
+    expect(command.highContrast).toBe(true);
+  });
+
+  it('reads less motion as reduced motion', () => {
+    expect(parse('Less motion, please').reduceMotion).toBe(true);
+  });
+
+  it('describes a dimmed screen in plain words', () => {
+    expect(parse('The screen is too bright').explanation).toBe('Applied a dimmer screen.');
+  });
+});

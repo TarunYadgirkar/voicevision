@@ -364,9 +364,9 @@
   ];
   var RELATIVE_RULES = [
     { test: /\b(wrap (the )?(text|lines|long lines)|word wrap|reflow text)\b/, label: "text wrapping", patch: { textWrap: true } },
-    { test: /\b(less glare|reduce glare|softer light)\b/, label: "softer light", patch: { brightness: 0.8, warmTone: true } },
+    { test: /\b(less glare|reduce glare|too much glare|softer light)\b/, label: "softer light", patch: { brightness: 0.8, warmTone: true } },
     {
-      test: /\b((bigger|larger|increase|enlarge) (the )?(text|font)|(?:text|font)( size)? (bigger|larger)|make (the )?(text|font) (bigger|larger))\b/,
+      test: /\b((text|words|letters|print|font) (is|are) too small|(bigger|larger|increase|enlarge) (the )?(text|font)|(?:text|font)( size)? (bigger|larger)|make (the )?(text|font) (bigger|larger))\b/,
       label: "larger text",
       patch: (c) => ({ textScale: Math.min(2, Number((c.textScale + STEP).toFixed(2))) })
     },
@@ -376,7 +376,7 @@
       patch: (c) => ({ textScale: Math.max(1, Number((c.textScale - STEP).toFixed(2))) })
     },
     {
-      test: /\b((more|increase|wider) (line )?spacing|space (the )?lines (out|more))\b/,
+      test: /\b((more|increase|wider) (line )?spacing|space (the )?lines (out|more)|lines (are|feel|look) (too )?(cramped|tight|close together))\b/,
       label: "more line spacing",
       patch: (c) => ({ lineSpacing: Math.min(2.4, Number((c.lineSpacing + STEP).toFixed(2))) })
     },
@@ -484,7 +484,7 @@
     },
     {
       test: /\b(too bright|hurts my eyes|screen is blinding|blinding)\b/,
-      label: "dimmed",
+      label: "a dimmer screen",
       patch: { darkMode: true, brightness: 0.6 }
     },
     {
@@ -518,7 +518,12 @@
       patch: { boldText: true }
     },
     {
-      test: /\b(animations make me dizzy|autoplay videos bother me|reduce motion|moving things make me (nauseous|sick))\b/,
+      test: /\b(clearer (text|words|letters)|make (the )?(text|words|letters) clearer)\b/,
+      label: "clearer text",
+      patch: { boldText: true, highContrast: true }
+    },
+    {
+      test: /\b(animations make me dizzy|autoplay videos bother me|reduce motion|less motion|moving things make me (nauseous|sick))\b/,
       label: "reduced motion",
       patch: { reduceMotion: true }
     }
