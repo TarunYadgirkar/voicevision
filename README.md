@@ -1,6 +1,12 @@
 # VoiceVision
 
-Adjustable reading tools for people with low vision and other access needs. Use voice, typing, or manual controls; common commands work without AI.
+Adjustable reading tools for people with low vision and other access needs. Say or type what is hard to see ("the text is too small", "there's too much glare") and the page adapts. Common requests are understood on your device, without AI.
+
+Live: https://voicevision-eight.vercel.app
+
+![VoiceVision workspace with two changes marked on the reading sheet](assets/generated/voicevision-after-desktop.png)
+
+![Clicking spoken-style phrases changes the reading sheet and marks each change](assets/generated/voicevision-after.gif)
 
 ## What works
 
@@ -25,7 +31,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. Typing and manual controls work without an API key. For optional cloud parsing, copy `.env.example` to `.env.local` and set `GEMINI_API_KEY` server-side. Speech support depends on browser and microphone permissions; Chrome/Edge are the target extension browsers.
+Open http://localhost:3000. Typing and manual controls work without an API key. For optional cloud parsing, copy `.env.example` to `.env.local` and set `GEMINI_API_KEY` server-side. The interpreter uses `gemini-3.5-flash-lite` with minimal thinking; the model ID lives in `src/app/api/interpret/model.ts`. Speech support depends on browser and microphone permissions; Chrome/Edge are the target extension browsers.
 
 ```sh
 npm test
@@ -52,4 +58,10 @@ Next.js API uses validated command input/output and a server-only Gemini key. Lo
 
 Production dependency audit was clean during October 2, 2026 checks. Development dependencies have upstream advisories; do not expose development/test servers publicly. Product changes still require checks with disabled users and live assistive technology; software tests do not establish clinical effectiveness.
 
-Originally built at AI Collective Tri-Valley hackathon, June 2026. Current architecture and agent rules: [AGENTS.md](AGENTS.md).
+## History
+
+- **June 2026:** first built at the AI Collective Tri-Valley hackathon as a voice-driven screen filter.
+- **September 2026:** a later variant, ClearSay (renamed Vision Assist), was built at the Berkeley x DeepMind hackathon as a Vite web app and Chrome extension that added a Gemini Computer Use browser agent and condition-based field-loss masks. This repository supersedes it. Its colour correction used the same daltonization matrices as VoiceVision, and its masks and page-screenshot agent conflict with VoiceVision's rules (no field-loss masks, page content never sent to the cloud), so no code was carried over.
+- **October 2026:** rebuilt as an accessible reading workspace with a native Mac companion and a multi-browser extension.
+
+Current architecture and agent rules: [AGENTS.md](AGENTS.md).
