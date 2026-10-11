@@ -15,6 +15,12 @@ const PHRASES = ['The text is too small', 'Lines feel cramped', "There's too muc
 
 const SAMPLE_TEXT = 'A little space can make a big difference.\n\nReading should feel comfortable. Change the text size, give each line more room, or soften the light until this page works for you. There is no single setting that suits everyone.\n\nTry one change at a time. Your preferences stay on this browser, and you can undo a change or reset whenever you want.';
 
+// A <details> that is itself the fragment target does not open on its own.
+function openExtensionHelp() {
+  const details = document.getElementById('other-websites');
+  if (details instanceof HTMLDetailsElement) details.open = true;
+}
+
 export default function Home() {
   const filters = useFilterState();
   const runner = useCommandRunner({ getState: getFilterState, onCommand: filters.apply, onUndo: filters.undo });
@@ -32,7 +38,7 @@ export default function Home() {
           <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full bg-signal text-on-signal"><Eye size={22} weight="bold" /></span>
           VoiceVision
         </a>
-        <a href="#other-websites" className="button shrink-0 px-3 text-sm sm:px-4 sm:text-base">Browser extension</a>
+        <a href="#other-websites" onClick={openExtensionHelp} className="button shrink-0 px-3 text-sm sm:px-4 sm:text-base">Browser extension</a>
       </header>
 
       <main id="workspace" className="mx-auto flex w-full max-w-7xl flex-col gap-14 px-4 pb-16 sm:px-8">
@@ -43,7 +49,7 @@ export default function Home() {
               <p className="type-lead text-muted">Describe the problem and this page adjusts to fix it. Common requests are understood on your device.</p>
             </div>
 
-            <CommandBar onSubmit={submit} cancellationRevision={speechRevision} onReset={handleReset} pending={runner.pending} error={runner.error} entries={runner.entries} />
+            <CommandBar onSubmit={submit} cancellationRevision={speechRevision} pending={runner.pending} error={runner.error} entries={runner.entries} />
             {runner.pending && <button type="button" onClick={runner.cancel} className="button self-start">Cancel request</button>}
 
             <div className="flex flex-col gap-3">
@@ -51,7 +57,7 @@ export default function Home() {
               <ul className="flex flex-wrap gap-2">
                 {PHRASES.map(phrase => (
                   <li key={phrase}>
-                    <button type="button" className="phrase" onClick={() => submit(phrase)} disabled={runner.pending}>
+                    <button type="button" className="phrase aria-disabled:opacity-50" aria-disabled={runner.pending} onClick={() => { if (!runner.pending) submit(phrase); }}>
                       <Quotes size={18} weight="fill" aria-hidden className="shrink-0 text-muted" />{phrase}
                     </button>
                   </li>

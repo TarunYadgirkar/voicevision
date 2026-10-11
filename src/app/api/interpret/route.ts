@@ -54,7 +54,7 @@ function upstreamErrorResponse(err: unknown, headers: Record<string, string>) {
   const status = errShape?.status || errShape?.httpStatusCode || 500;
   if (status === 429) {
     return NextResponse.json(
-      { error: 'Rate limit reached — try again in a minute' },
+      { error: 'Rate limit reached. Try again in a minute.' },
       { status: 429, headers: { ...headers, 'Retry-After': '60' } }
     );
   }
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   const rate = checkRateLimit(req);
   if (rate.limited) {
     return NextResponse.json(
-      { error: 'Too many requests — try again in a moment' },
+      { error: 'Too many requests. Try again in a moment.' },
       { status: 429, headers: { ...headers, 'Retry-After': String(rate.retryAfterSeconds) } }
     );
   }
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'Voice interpretation is not configured on this server (GEMINI_API_KEY is unset).' },
+      { error: 'AI help is not set up on this server. Common requests still work on your device.' },
       { status: 503, headers }
     );
   }

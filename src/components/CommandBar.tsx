@@ -6,7 +6,6 @@ import { CommandEntry } from '@/hooks/useCommandRunner';
 
 interface Props {
   onSubmit: (transcript: string) => void;
-  onReset: () => void;
   pending: boolean;
   cancellationRevision: number;
   error: string;
@@ -40,6 +39,7 @@ export function CommandBar({ onSubmit, pending, error, entries, cancellationRevi
     if (!draft.trim()) return;
     onSubmit(draft);
     setDraft('');
+    inputRef.current?.focus();
   };
 
   const latest = entries[0];
@@ -84,7 +84,7 @@ export function CommandBar({ onSubmit, pending, error, entries, cancellationRevi
       )}
 
       <div role="status" aria-live="polite" aria-atomic="true">{latest && (
-        <div className="animate-rise flex flex-col gap-1 rounded-md bg-raised p-3 shadow-[var(--shadow-raised)]">
+        <div key={latest.seq} className="animate-rise flex flex-col gap-1 rounded-md bg-raised p-3 shadow-[var(--shadow-raised)]">
           <p className="text-sm text-muted">You said &ldquo;{latest.transcript}&rdquo;</p>
           <p className="flex items-start gap-2 text-text">
             {latest.source === 'device' ? (

@@ -53,7 +53,7 @@ export function VoiceButton({ onSubmit, pending, buttonRef, cancellationRevision
         <CircleNotch size={28} weight="bold" aria-hidden className={`${ICON_BASE} ${iconState(pending)} animate-spin`} />
       </span>
     </button>
-    <span role="status" className="sr-only">{listening ? 'Listening. Speak your reading request.' : pending ? 'Interpreting command.' : 'Microphone idle.'}</span>
+    <span role="status" className="sr-only">{listening ? 'Listening. Speak your reading request.' : pending ? 'Interpreting command.' : ''}</span>
     {error && <p role="alert" className="max-w-64 text-sm text-text">{error}</p>}
     </div>
   );

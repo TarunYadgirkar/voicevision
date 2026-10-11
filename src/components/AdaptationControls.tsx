@@ -16,7 +16,7 @@ interface Props {
 const READING_CONTROLS: { key: ReadingKey; label: string; min: number; max: number; step: number }[] = [
   { key: 'textScale', label: 'Text size', min: 1, max: 2, step: 0.05 },
   { key: 'lineSpacing', label: 'Line spacing', min: 1.4, max: 2.4, step: 0.1 },
-  { key: 'brightness', label: 'Brightness', min: 0.3, max: 1.5, step: 0.05 },
+  { key: 'brightness', label: 'Brightness', min: 0.1, max: 1.5, step: 0.05 },
 ];
 
 const COMFORT = [...adaptationsIn('comfort'), ...adaptationsIn('field').filter(adaptation => adaptation.id === 'zoom-full')];
@@ -52,7 +52,7 @@ export function AdaptationControls({ state, onToggle, onIntensityChange, onReadi
             <div key={control.key} className="flex flex-col gap-1">
               <div className="flex items-baseline justify-between gap-3">
                 <label htmlFor={`reading-${control.key}`} className="font-bold">{control.label}</label>
-                <output htmlFor={`reading-${control.key}`} className="type-value text-muted">{display}</output>
+                <output htmlFor={`reading-${control.key}`} aria-live="off" className="type-value text-muted">{display}</output>
               </div>
               <input id={`reading-${control.key}`} type="range" min={control.min} max={control.max} step={control.step}
                 value={value} aria-valuetext={display} onChange={event => onReadingChange(control.key, Number(event.target.value))}
@@ -92,10 +92,14 @@ export function AdaptationControls({ state, onToggle, onIntensityChange, onReadi
           <Disclosure title="Fine-tune strength">
             <div className="grid gap-x-8 gap-y-3 md:grid-cols-2">
               {intensityKeys.map(key => (
-                <label key={key} className="flex flex-col gap-1">
-                  <span className="flex justify-between gap-3 font-bold">{INTENSITY_LABELS[key]}<span className="type-value font-normal text-muted">{Math.round(state.intensities[key] * 100)}%</span></span>
-                  <input type="range" min={0} max={1} step={0.05} value={state.intensities[key]} onChange={event => onIntensityChange(key, Number(event.target.value))} className="min-h-11 w-full" />
-                </label>
+                <div key={key} className="flex flex-col gap-1">
+                  <div className="flex justify-between gap-3">
+                    <label htmlFor={`strength-${key}`} className="font-bold">{INTENSITY_LABELS[key]}</label>
+                    <span aria-hidden className="type-value text-muted">{Math.round(state.intensities[key] * 100)}%</span>
+                  </div>
+                  <input id={`strength-${key}`} type="range" min={0} max={1} step={0.05} value={state.intensities[key]} aria-valuetext={`${Math.round(state.intensities[key] * 100)}%`}
+                    onChange={event => onIntensityChange(key, Number(event.target.value))} className="min-h-11 w-full" />
+                </div>
               ))}
             </div>
           </Disclosure>

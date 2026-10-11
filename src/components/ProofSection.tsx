@@ -42,7 +42,7 @@ export function ProofSection() {
   const [type, setType] = useState<DichromacyType>('deuteranopia');
 
   return (
-    <Disclosure title="Compare colour adjustments" titleId="proof-heading">
+    <Disclosure title="Compare colour adjustments">
       <p className="type-body text-muted">An educational comparison of two filters. It is not a vision test, and cannot predict how an individual will see these colours.</p>
       <fieldset className="flex flex-wrap gap-3">
         <legend className="mb-2 font-bold">Choose a colour simulation</legend>
