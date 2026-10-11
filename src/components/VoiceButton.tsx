@@ -22,10 +22,10 @@ export function VoiceButton({ onSubmit, pending, buttonRef, cancellationRevision
 
   if (!supported) {
     return (
-      <div className="flex items-center gap-2 rounded-md bg-sunken px-3 py-2.5 text-sm text-muted">
+      <p className="flex max-w-40 items-center gap-2 text-sm text-muted">
         <WarningCircle size={18} weight="regular" className="shrink-0" aria-hidden />
-        Speech input needs Chrome or Edge. Typing works everywhere.
-      </div>
+        Voice needs Chrome or Edge. Typing works here.
+      </p>
     );
   }
 
@@ -40,17 +40,17 @@ export function VoiceButton({ onSubmit, pending, buttonRef, cancellationRevision
       disabled={pending && !listening}
       aria-pressed={listening}
       aria-label={label}
-      className={`relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full
+      className={`relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full
         transition-[background-color,color,box-shadow,scale] duration-200 ease-[cubic-bezier(0.2,0,0,1)]
         active:scale-96 disabled:opacity-50
         ${listening
-          ? 'animate-listening bg-accent text-on-accent'
-          : 'bg-sunken text-text hover:bg-line-soft'}`}
+          ? 'animate-listening bg-signal text-on-signal'
+          : 'bg-accent text-on-accent hover:opacity-90'}`}
     >
-      <span className="relative block h-6 w-6">
-        <Microphone size={24} weight="fill" aria-hidden className={`${ICON_BASE} ${iconState(!listening && !pending)}`} />
-        <Waveform size={24} weight="bold" aria-hidden className={`${ICON_BASE} ${iconState(listening)}`} />
-        <CircleNotch size={24} weight="bold" aria-hidden className={`${ICON_BASE} ${iconState(pending)} animate-spin`} />
+      <span className="relative block h-7 w-7">
+        <Microphone size={28} weight="fill" aria-hidden className={`${ICON_BASE} ${iconState(!listening && !pending)}`} />
+        <Waveform size={28} weight="bold" aria-hidden className={`${ICON_BASE} ${iconState(listening)}`} />
+        <CircleNotch size={28} weight="bold" aria-hidden className={`${ICON_BASE} ${iconState(pending)} animate-spin`} />
       </span>
     </button>
     <span role="status" className="sr-only">{listening ? 'Listening. Speak your reading request.' : pending ? 'Interpreting command.' : 'Microphone idle.'}</span>

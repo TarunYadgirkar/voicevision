@@ -96,3 +96,34 @@ export const INTENSITY_LABELS: Record<keyof FilterIntensities, string> = {
   zoom: 'Magnification',
   dimOverlay: 'Dimming',
 };
+
+export type ReadingKey = 'textScale' | 'lineSpacing' | 'brightness';
+
+export interface ReadingChange {
+  key: ReadingKey;
+  label: string;
+  display: string;
+  baseline: number;
+}
+
+export const READING_BASELINES: Record<ReadingKey, number> = { textScale: 1, lineSpacing: 1.6, brightness: 1 };
+
+export function formatReading(key: ReadingKey, value: number): string {
+  if (key === 'lineSpacing') return `${value.toFixed(1)}×`;
+  return `${Math.round(value * 100)}%`;
+}
+
+const READING_LABELS: Record<ReadingKey, string> = { textScale: 'Text size', lineSpacing: 'Line spacing', brightness: 'Brightness' };
+
+// Reading values differ from toggles: they are always "on", so only a move away from the
+// baseline counts as a change worth showing.
+export function readingChanges(state: FilterState): ReadingChange[] {
+  const values: Record<ReadingKey, number> = {
+    textScale: state.textScale,
+    lineSpacing: state.lineSpacing,
+    brightness: state.brightness ?? READING_BASELINES.brightness,
+  };
+  return (Object.keys(values) as ReadingKey[])
+    .filter(key => Math.abs(values[key] - READING_BASELINES[key]) > 0.001)
+    .map(key => ({ key, label: READING_LABELS[key], display: formatReading(key, values[key]), baseline: READING_BASELINES[key] }));
+}

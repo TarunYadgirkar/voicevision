@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { Disclosure } from './Disclosure';
 import { IshiharaPlate } from './IshiharaPlate';
 import { DICHROMACY_TYPES, DichromacyType } from '@/lib/filters';
 
@@ -18,7 +19,7 @@ interface PaneProps {
 
 function ProofPane({ type, assist, heading, note }: PaneProps) {
   return (
-    <figure className="flex flex-col gap-3 rounded-lg bg-surface p-4">
+    <figure className="flex flex-col gap-3 rounded-[var(--radius-md)] bg-surface p-4">
       <IshiharaPlate
         type={type}
         scopedFilterId={`${type}-${assist}`}
@@ -41,20 +42,19 @@ export function ProofSection() {
   const [type, setType] = useState<DichromacyType>('deuteranopia');
 
   return (
-    <details className="workspace-card">
-      <summary id="proof-heading" className="type-heading text-xl">Explore colour adjustments</summary>
-      <p className="type-body my-4 text-muted">An educational comparison of two filters. It is not a vision test, and cannot predict how an individual will see these colours.</p>
+    <Disclosure title="Compare colour adjustments" titleId="proof-heading">
+      <p className="type-body text-muted">An educational comparison of two filters. It is not a vision test, and cannot predict how an individual will see these colours.</p>
       <fieldset className="flex flex-wrap gap-3">
-        <legend className="mb-2 font-medium">Choose a colour simulation</legend>
+        <legend className="mb-2 font-bold">Choose a colour simulation</legend>
         {DICHROMACY_TYPES.map(option => (
-          <label key={option} className="flex min-h-11 items-center gap-2 rounded-lg bg-surface px-3">
+          <label key={option} className="flex min-h-11 items-center gap-2 rounded-[var(--radius-sm)] bg-surface px-3">
             <input type="radio" name="proof-colour" value={option} checked={option === type} onChange={() => setType(option)} />
             {TYPE_LABELS[option]}
           </label>
         ))}
       </fieldset>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <ProofPane
           type={type}
           assist="simulate"
@@ -68,6 +68,6 @@ export function ProofSection() {
           note="Redistributes colour differences. Try it on your own content and decide whether it helps."
         />
       </div>
-    </details>
+    </Disclosure>
   );
 }
