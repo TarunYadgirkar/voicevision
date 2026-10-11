@@ -27,12 +27,12 @@ export default function Home() {
   return (
     <>
       <a href="#describe" className="skip-link">Skip to reading controls</a>
-      <header className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-5 sm:px-8">
+      <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-5 sm:px-8">
         <a href="#workspace" className="flex min-h-11 items-center gap-2.5 text-xl font-bold">
           <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full bg-signal text-on-signal"><Eye size={22} weight="bold" /></span>
           VoiceVision
         </a>
-        <a href="#other-websites" className="button">Browser extension</a>
+        <a href="#other-websites" className="button shrink-0 px-3 text-sm sm:px-4 sm:text-base">Browser extension</a>
       </header>
 
       <main id="workspace" className="mx-auto flex w-full max-w-7xl flex-col gap-14 px-4 pb-16 sm:px-8">

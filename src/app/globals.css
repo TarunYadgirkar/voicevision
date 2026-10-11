@@ -111,6 +111,7 @@
   --font-display: var(--font-bricolage);
 }
 
+@layer base {
 /* Without an explicit background on <html>, the browser propagates <body>'s background
    to the canvas, which sits outside body's filter. Dark mode then inverted the cards but
    left the page behind them light. Painting <html> stops the propagation. */
@@ -125,7 +126,9 @@ body {
   font-size: 1.0625rem;
   line-height: 1.6;
 }
+}
 
+@layer components {
 /* Type scale (1.25 ratio from 17px). One definition per role; components pick a role. */
 .type-display {
   font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
@@ -174,6 +177,7 @@ body {
 .type-value {
   font-variant-numeric: tabular-nums;
 }
+}
 
 @keyframes plate-drift {
   0% { transform: translate3d(0, 0, 0) rotate(0deg); }
@@ -207,6 +211,7 @@ body {
 .vv-dark .vv-truecolor { filter: invert(100%) hue-rotate(180deg); }
 .vv-dark img, .vv-dark video, .vv-dark picture, .vv-dark canvas { filter: invert(100%) hue-rotate(180deg); }
 
+@layer base {
 input[type='range'] { accent-color: var(--text); }
 input[type='checkbox'], input[type='radio'] { accent-color: var(--text); width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
 button, input, textarea, summary { font: inherit; }
@@ -223,7 +228,9 @@ a { text-underline-offset: 0.2em; }
   box-shadow: 0 0 0 7px var(--signal);
 }
 :target { scroll-margin-top: 1.5rem; }
+}
 
+@layer components {
 .sheet {
   min-width: 0;
   border-radius: var(--radius-lg);
@@ -329,6 +336,7 @@ kbd {
 
 .skip-link { position: absolute; top: 0.75rem; left: 1rem; z-index: 10000; padding: 0.75rem 1rem; border-radius: var(--radius-sm); background: var(--signal); color: var(--text-on-signal); font-weight: 700; transform: translateY(-200%); }
 .skip-link:focus { transform: translateY(0); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
