@@ -4,6 +4,7 @@ import { AccessibilityCommand, FilterState } from '@/types';
 import { validateCommand, protectAssistiveCommand } from '@/lib/command';
 import { normalizeFilterState } from '@/lib/persistence';
 import { SYSTEM_PROMPT } from './prompt';
+import { INTERPRET_MODEL, interpretConfig } from './model';
 import { corsHeaders } from './cors';
 import { checkRateLimit } from './rateLimit';
 
@@ -40,21 +41,11 @@ async function askGemini(apiKey: string, { transcript, currentState }: ParsedBod
     ? `currentState: ${JSON.stringify(currentState)}\ntranscript: ${transcript}`
     : transcript;
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-lite',
+    model: INTERPRET_MODEL,
     contents: [{ role: 'user', parts: [{ text: userContent }] }],
-    config: {
-      systemInstruction: SYSTEM_PROMPT,
-      responseMimeType: 'application/json',
-      maxOutputTokens: 384,
-      temperature: 0.1,
-    },
+    config: interpretConfig(SYSTEM_PROMPT),
   });
-  const raw = response.text ?? '';
-  if (raw.trim()) return raw;
-  const part = response.candidates?.[0]?.content?.parts?.find(
-    (p: { thought?: boolean; text?: string }) => !p.thought && p.text
-  );
-  return part?.text ?? '';
+  return response.text ?? '';
 }
 
 function upstreamErrorResponse(err: unknown, headers: Record<string, string>) {
