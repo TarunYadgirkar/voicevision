@@ -201,6 +201,34 @@ describe('colorAssist', () => {
   });
 });
 
+describe('British spellings', () => {
+  it('inverts colours on device', () => {
+    expect(parse('invert colours').invertColors).toBe(true);
+  });
+
+  it('turns off the colour filter without resetting', () => {
+    const command = parse('turn off the colour filter');
+    expect(command.clear).toEqual(['colorMode']);
+    expect(command.reset).toBe(false);
+  });
+
+  it('recognises "colour blind" as a condition and leaves settings unchanged', () => {
+    const command = parse('i am colour blind');
+    expect(command.colorMode).toBeNull();
+    expect(command.explanation).toMatch(/settings unchanged/i);
+  });
+
+  it('helps with colours on an explicit request', () => {
+    expect(parse('help me see colours').colorAssist).toBe('correct');
+  });
+
+  it('applies a functional request after a British condition phrase', () => {
+    const command = parse("I'm colour blind and the screen is too bright");
+    expect(command.colorMode).toBeNull();
+    expect(command.brightness).toBe(0.6);
+  });
+});
+
 describe('phrases the parser must not guess at', () => {
   it.each([
     'what time is it',

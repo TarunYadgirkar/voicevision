@@ -41,7 +41,7 @@ function emptyCommand(): AccessibilityCommand {
 }
 
 function normalize(transcript: string): string {
-  return transcript.toLowerCase().replace(/[^a-z0-9\s'-]/g, ' ').replace(/\s+/g, ' ').trim();
+  return transcript.toLowerCase().replace(/[^a-z0-9\s'-]/g, ' ').replace(/\bcolour/g, 'color').replace(/\s+/g, ' ').trim();
 }
 
 function clamp01(value: number): number {
