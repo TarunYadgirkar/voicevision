@@ -43,7 +43,7 @@ npm test; npm run lint; npx tsc --noEmit; npm run build; npm run build:ext.
 Check keyboard, narrow screens, 200% zoom, reduced motion, microphone denial, reset/late reply, persistence and extension behavior. Report actual evidence and limitations. Do not claim clinical effectiveness, assistive-technology validation, deployment or store publication without verification.
 
 ## Extension protocol
-GET_STATE; APPLY_COMMAND {command,expectedRevision?,transcript?}; SET_READING {key,value}; UNDO; REPLACE_STATE {state}; TOGGLE_FILTER {key}; SET_INTENSITY {key,value}; vv:scope {scope}; vv:interpret {transcript}.
+GET_STATE; APPLY_COMMAND {command,expectedRevision?,transcript?}; SET_READING {key,value}; UNDO; REPLACE_STATE {state}; TOGGLE_FILTER {key}; SET_INTENSITY {key,value}; vv:scope {scope}; vv:interpret {transcript}; vv:enabled {enabled?} (query or set the all-sites switch, stored as vvEnabled; while off, changing messages return an error).
 Scope site/global. Unknown local phrases return revision for stale cloud guard. Mic port voicevision-mic sends START/STOP and returns start/end/result/error.
 
 <!-- BEGIN:nextjs-agent-rules -->
