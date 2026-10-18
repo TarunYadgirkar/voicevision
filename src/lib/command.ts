@@ -25,26 +25,27 @@ function parseIntensities(value: unknown): Partial<FilterIntensities> | null | f
   const result: Partial<FilterIntensities> = {};
   for (const key of INTENSITY_KEYS) {
     const item = value[key];
-    if (item === undefined) continue;
+    if (item == null) continue;
     if (!inRange(item, 0, 1)) return false;
     result[key] = item;
   }
   return result;
 }
 function validClear(value: unknown): boolean {
-  return value === undefined || (Array.isArray(value) && value.every(key => ['zoom', 'colorMode', 'hemianopia'].includes(key)));
+  return value == null || (Array.isArray(value) && value.every(key => ['zoom', 'colorMode', 'hemianopia'].includes(key)));
 }
+// The model is told unmentioned fields must be null, so null means "not set" everywhere.
 export function validateCommand(value: unknown): AccessibilityCommand | null {
-  if (!isRecord(value) || typeof value.reset !== 'boolean') return null;
+  if (!isRecord(value) || (value.reset != null && typeof value.reset !== 'boolean')) return null;
   if (!validFields(value) || !validClear(value.clear)) return null;
-  if (value.explanation !== undefined && typeof value.explanation !== 'string') return null;
+  if (value.explanation != null && typeof value.explanation !== 'string') return null;
   const intensities = parseIntensities(value.intensities);
   if (intensities === false) return null;
   const keys = [...BOOLEAN_KEYS, ...Object.keys(ENUMS), ...Object.keys(RANGES)];
   const fields = Object.fromEntries(keys.map(key => [key, value[key] ?? null]));
   return {
-    ...fields, reset: value.reset, intensities,
-    ...(value.clear === undefined ? {} : { clear: value.clear }),
+    ...fields, reset: value.reset === true, intensities,
+    ...(value.clear == null ? {} : { clear: value.clear }),
     explanation: typeof value.explanation === 'string' ? value.explanation.slice(0, 400) : 'Reading settings updated.',
   } as AccessibilityCommand;
 }
