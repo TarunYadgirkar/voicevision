@@ -106,8 +106,16 @@ document.addEventListener('input', event => {
 powerBtn.addEventListener('click', async () => {
   invalidate();
   const revision = requestRevision;
-  const result = await send({ type: 'vv:enabled', enabled: !enabled });
-  if (revision !== requestRevision || !result) return;
+  const next = !enabled;
+  const result = await send({ type: 'vv:enabled', enabled: next });
+  if (revision !== requestRevision) return;
+  // Pages without the content script (browser pages, stores, PDFs) still flip the switch for every other site.
+  if (!result) {
+    await chrome.storage.local.set({ vvEnabled: next });
+    renderPower(next);
+    status(next ? 'VoiceVision is on for other sites. This page cannot be adjusted.' : 'VoiceVision is off on every site. This page cannot be adjusted.');
+    return;
+  }
   renderPower(result.enabled);
   render(result.state);
   status(result.enabled ? 'VoiceVision is on. Your saved settings are back.' : 'Switched off. This page looks the way the site made it.');
@@ -186,4 +194,4 @@ async function startListening() {
 }
 micBtn.addEventListener('click', () => { if (!activePort) return void startListening(); activePort.postMessage({ type: 'STOP' }); activePort.disconnect(); activePort = null; setMicIdle(); });
 el('openSiteBtn').addEventListener('click', () => extensionTabs.create({ url: SITE_URL }));
-chrome.storage.local.get(['vvScope', 'vvCloudOptIn'], data => { scope = data.vvScope === 'site' ? 'site' : 'global'; el('cloudOptIn').checked = !LOCAL_ONLY && data.vvCloudOptIn === true; el('cloudOptIn').disabled = LOCAL_ONLY; if (LOCAL_ONLY) el('cloudOptIn').parentElement.append(' — unavailable in this local Firefox package'); void send({ type: 'vv:enabled' }).then(result => { if (!result) return; renderPower(result.enabled); render(result.state); status(result.enabled ? 'Ready. Settings save on this device.' : 'Switched off.'); }); });
+chrome.storage.local.get(['vvScope', 'vvCloudOptIn', 'vvEnabled'], data => { renderPower(data.vvEnabled); scope = data.vvScope === 'site' ? 'site' : 'global'; el('cloudOptIn').checked = !LOCAL_ONLY && data.vvCloudOptIn === true; el('cloudOptIn').disabled = LOCAL_ONLY; if (LOCAL_ONLY) el('cloudOptIn').parentElement.append(' — unavailable in this local Firefox package'); void send({ type: 'vv:enabled' }).then(result => { if (!result) return; renderPower(result.enabled); render(result.state); status(result.enabled ? 'Ready. Settings save on this device.' : 'Switched off.'); }); });
