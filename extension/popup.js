@@ -7,7 +7,9 @@ const el = id => document.getElementById(id);
 const micBtn = el('micBtn');
 const micLabel = el('micLabel');
 if (LOCAL_ONLY) { micBtn.disabled = true; micLabel.textContent = 'Voice unavailable in this local package — use typing'; }
-const explanationEl = el('explanation');
+const statusTextEl = el('statusText');
+const sourceBadgeEl = el('sourceBadge');
+const powerBtn = el('powerBtn');
 const controlsEl = el('controls');
 const filtersEl = el('filters');
 let lastState = null;
@@ -15,14 +17,38 @@ let scope = 'global';
 let activePort = null;
 let requestRevision = 0;
 let pendingController = null;
+let enabled = true;
 const GROUPS = [
   ['Display', [['darkMode', true, 'Dark mode'], ['highContrast', true, 'High contrast'], ['warmTone', true, 'Warm tone'], ['invertColors', true, 'Invert colors'], ['textWrap', true, 'Wrap long lines'], ['boldText', true, 'Bold text'], ['reduceMotion', true, 'Reduce motion'], ['dimOverlay', true, 'Dim screen']]],
   ['Optional color adjustments', [['colorMode', 'deuteranopia', 'Deutan adjustment'], ['colorMode', 'protanopia', 'Protan adjustment'], ['colorMode', 'tritanopia', 'Tritan adjustment'], ['colorMode', 'achromatopsia', 'Contrast adjustment']]],
 ];
+const STRENGTHS = [['darkMode', 'Dark mode'], ['invertColors', 'Invert colors'], ['highContrast', 'High contrast'], ['warmTone', 'Warm tone'], ['dimOverlay', 'Dim screen'], ['colorMode', 'Color adjustment'], ['blur', 'Clarity boost'], ['zoom', 'Magnification']];
+const SOURCE_LABELS = { device: 'Understood on this device', cloud: 'Understood by Gemini' };
 const PRESETS = { reading: { textScale: 1.3, lineSpacing: 1.9, boldText: true }, glare: { brightness: 0.8, warmTone: true }, contrast: { highContrast: true, boldText: true }, calm: { reduceMotion: true } };
 function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`); }
 function invalidate() { requestRevision += 1; pendingController?.abort(); pendingController = null; const port = activePort; activePort = null; port?.disconnect(); setMicIdle(); }
-function status(text) { explanationEl.textContent = text; }
+function status(text, source) {
+  statusTextEl.textContent = text;
+  sourceBadgeEl.hidden = !SOURCE_LABELS[source];
+  sourceBadgeEl.textContent = SOURCE_LABELS[source] ?? '';
+}
+function percent(value) { return `${Math.round(value * 100)}%`; }
+function formatValue(key, value) { return key === 'lineSpacing' ? Number(value).toFixed(1) : percent(value); }
+function valueText(key, value) { return key === 'lineSpacing' ? `${value} times` : `${Math.round(value * 100)} percent`; }
+function activeStrengths(state) {
+  return STRENGTHS.filter(([key]) => state[key] && state.intensities?.[key] !== undefined && !(key === 'invertColors' && state.darkMode));
+}
+function strengthSection(state) {
+  const rows = activeStrengths(state).map(([key, label]) => `<div class="filter-row"><label for="strength-${key}">${label}<output>${percent(state.intensities[key])}</output></label><input id="strength-${key}" data-control-id="strength-${key}" data-intensity="${key}" type="range" min="0" max="1" step="0.05" value="${state.intensities[key]}" aria-valuetext="${valueText(key, state.intensities[key])}"></div>`);
+  return rows.length ? `<section><h2>Adjust strength</h2>${rows.join('')}</section>` : '';
+}
+function renderPower(next) {
+  enabled = next !== false;
+  powerBtn.setAttribute('aria-checked', String(enabled));
+  el('powerLabel').textContent = enabled ? 'On' : 'Off';
+  el('offBanner').hidden = enabled;
+  el('pageControls').hidden = !enabled;
+}
 async function send(message) {
   try {
     const [tab] = await extensionTabs.query({ active: true, currentWindow: true });
@@ -33,12 +59,16 @@ async function send(message) {
     return null;
   }
 }
+function readingSliders(state) {
+  return [['textScale', 'Text size', 1, 2, 0.1, state.textScale ?? 1], ['lineSpacing', 'Line spacing', 1.4, 2.4, 0.1, state.lineSpacing ?? 1.6], ['brightness', 'Brightness', 0.1, 1.5, 0.05, state.brightness ?? 1]].map(([key, label, min, max, step, value]) => `<div class="filter-row"><label for="reading-${key}">${label}<output>${formatValue(key, value)}</output></label><input id="reading-${key}" data-control-id="${key}" data-reading="${key}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" aria-valuetext="${valueText(key, value)}"></div>`).join('');
+}
 function render(state) {
+  if (state?.enabled === false) renderPower(false);
   if (!state || state.error) { if (state?.error) status(state.error); return; }
   lastState = state;
   const focused = document.activeElement.dataset.controlId;
-  filtersEl.innerHTML = [['textScale', 'Text size', 1, 2, 0.1, state.textScale ?? 1], ['lineSpacing', 'Line spacing', 1.4, 2.4, 0.1, state.lineSpacing ?? 1.6], ['brightness', 'Brightness', 0.1, 1.5, 0.05, state.brightness ?? 1]].map(([key, label, min, max, step, value]) => `<div class="filter-row"><label for="reading-${key}">${label}<output>${key === 'lineSpacing' ? Number(value).toFixed(1) : `${Math.round(value * 100)}%`}</output></label><input id="reading-${key}" data-control-id="${key}" data-reading="${key}" type="range" min="${min}" max="${max}" step="${step}" value="${value}" aria-valuetext="${key === 'lineSpacing' ? `${value} times` : `${Math.round(value * 100)} percent`}"></div>`).join('');
-  controlsEl.innerHTML = GROUPS.map(([title, items]) => `<section><h2>${title}</h2><div class="toggle-grid">${items.map(([key, value, label]) => `<button type="button" data-control-id="${key}-${value}" data-key="${key}" data-value="${value}" aria-pressed="${state[key] === value}">${escapeHtml(label)}</button>`).join('')}</div></section>`).join('') + `<section><h2>Save settings for</h2><div class="segmented">${['site', 'global'].map(value => `<button type="button" data-control-id="scope-${value}" data-scope="${value}" aria-pressed="${scope === value}">${value === 'site' ? 'This site' : 'All sites'}</button>`).join('')}</div></section>`;
+  filtersEl.innerHTML = readingSliders(state);
+  controlsEl.innerHTML = GROUPS.map(([title, items]) => `<section><h2>${title}</h2><div class="toggle-grid">${items.map(([key, value, label]) => `<button type="button" data-control-id="${key}-${value}" data-key="${key}" data-value="${value}" aria-pressed="${state[key] === value}">${escapeHtml(label)}</button>`).join('')}</div></section>`).join('') + strengthSection(state) + `<section><h2>Save settings for</h2><div class="segmented">${['site', 'global'].map(value => `<button type="button" data-control-id="scope-${value}" data-scope="${value}" aria-pressed="${scope === value}">${value === 'site' ? 'This site' : 'All sites'}</button>`).join('')}</div></section>`;
   if (focused) document.querySelector(`[data-control-id="${focused}"]`)?.focus();
 }
 async function manual(message) {
@@ -62,10 +92,37 @@ filtersEl.addEventListener('change', event => {
   if (!event.target.dataset.reading) return;
   void manual({ type: 'SET_READING', key: event.target.dataset.reading, value: Number(event.target.value) });
 });
+controlsEl.addEventListener('change', event => {
+  if (!event.target.dataset.intensity) return;
+  void manual({ type: 'SET_INTENSITY', key: event.target.dataset.intensity, value: Number(event.target.value) });
+});
+document.addEventListener('input', event => {
+  const input = event.target;
+  const key = input.dataset?.reading ?? input.dataset?.intensity;
+  if (!key) return;
+  input.labels?.[0]?.querySelector('output')?.replaceChildren(formatValue(key, input.value));
+  input.setAttribute('aria-valuetext', valueText(key, input.value));
+});
+powerBtn.addEventListener('click', async () => {
+  invalidate();
+  const revision = requestRevision;
+  const result = await send({ type: 'vv:enabled', enabled: !enabled });
+  if (revision !== requestRevision || !result) return;
+  renderPower(result.enabled);
+  render(result.state);
+  status(result.enabled ? 'VoiceVision is on. Your saved settings are back.' : 'Switched off. This page looks the way the site made it.');
+});
 document.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => void manual({ type: 'APPLY_COMMAND', command: { ...PRESETS[button.dataset.preset], reset: false } })));
 el('undoBtn').addEventListener('click', () => void manual({ type: 'UNDO' }));
 el('resetBtn').addEventListener('click', () => void manual({ type: 'APPLY_COMMAND', command: { reset: true } }));
 el('cloudOptIn').addEventListener('change', () => { if (LOCAL_ONLY) return; invalidate(); chrome.storage.local.set({ vvCloudOptIn: el('cloudOptIn').checked }); status(el('cloudOptIn').checked ? 'Cloud interpretation enabled for unrecognized commands.' : 'Cloud interpretation off. Common commands and buttons still work.'); });
+function showLocal(local) {
+  if (local.error) { render(local); return true; }
+  if (!local.handled) return false;
+  render(local.state);
+  status(local.command.explanation || 'Applied on this device.', 'device');
+  return true;
+}
 async function handleTranscript(rawText) {
   const text = typeof rawText === 'string' ? rawText.trim().slice(0, MAX_TRANSCRIPT_CHARS) : '';
   if (!text) { status('Enter a command first.'); return; }
@@ -76,7 +133,7 @@ async function handleTranscript(rawText) {
   status('Checking command…');
   const local = await send({ type: 'vv:interpret', transcript: text });
   if (revision !== requestRevision || !local) return;
-  if (local.handled) { render(local.state); status(local.command.explanation || 'Applied on this device.'); return; }
+  if (showLocal(local)) return;
   if (LOCAL_ONLY || !el('cloudOptIn').checked) { status('Command not recognized. Try “larger text”, “less glare”, or use the buttons. Cloud interpretation is optional in privacy settings.'); return; }
   await interpretRemotely(text, local.revision, revision);
 }
@@ -92,7 +149,7 @@ async function interpretRemotely(text, expectedRevision, revision) {
     const result = await send({ type: 'APPLY_COMMAND', command, expectedRevision, transcript: text });
     if (revision !== requestRevision || !result) return;
     render(result);
-    if (!result.error) status('Cloud command applied. Undo restores your previous settings.');
+    if (!result.error) status(`${command.explanation || 'Cloud command applied.'} Undo restores your previous settings.`, 'cloud');
   } catch {
     if (revision === requestRevision) status('Cloud interpretation unavailable or timed out. Use a common command or the buttons.');
   } finally { clearTimeout(timer); if (pendingController === controller) pendingController = null; }
@@ -129,4 +186,4 @@ async function startListening() {
 }
 micBtn.addEventListener('click', () => { if (!activePort) return void startListening(); activePort.postMessage({ type: 'STOP' }); activePort.disconnect(); activePort = null; setMicIdle(); });
 el('openSiteBtn').addEventListener('click', () => extensionTabs.create({ url: SITE_URL }));
-chrome.storage.local.get(['vvScope', 'vvCloudOptIn'], data => { scope = data.vvScope === 'site' ? 'site' : 'global'; el('cloudOptIn').checked = !LOCAL_ONLY && data.vvCloudOptIn === true; el('cloudOptIn').disabled = LOCAL_ONLY; if (LOCAL_ONLY) el('cloudOptIn').parentElement.append(' — unavailable in this local Firefox package'); void send({ type: 'GET_STATE' }).then(state => { render(state); if (state) status('Ready. Settings save on this device.'); }); });
+chrome.storage.local.get(['vvScope', 'vvCloudOptIn'], data => { scope = data.vvScope === 'site' ? 'site' : 'global'; el('cloudOptIn').checked = !LOCAL_ONLY && data.vvCloudOptIn === true; el('cloudOptIn').disabled = LOCAL_ONLY; if (LOCAL_ONLY) el('cloudOptIn').parentElement.append(' — unavailable in this local Firefox package'); void send({ type: 'vv:enabled' }).then(result => { if (!result) return; renderPower(result.enabled); render(result.state); status(result.enabled ? 'Ready. Settings save on this device.' : 'Switched off.'); }); });
