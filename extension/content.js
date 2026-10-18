@@ -366,12 +366,12 @@
     { test: /\b(wrap (the )?(text|lines|long lines)|word wrap|reflow text)\b/, label: "text wrapping", patch: { textWrap: true } },
     { test: /\b(less glare|reduce glare|too much glare|softer light)\b/, label: "softer light", patch: { brightness: 0.8, warmTone: true } },
     {
-      test: /\b((text|words|letters|print|font) (is|are) too small|(bigger|larger|increase|enlarge) (the )?(text|font)|(?:text|font)( size)? (bigger|larger)|make (the )?(text|font) (bigger|larger))\b/,
+      test: /\b((text|words|letters|print|font) (is|are) too small|(bigger|larger|increase|enlarge) (the )?(text|font)|(?:text|font)( size)? (bigger|larger)|make (the )?(text|font) (bigger|larger)|(bump|turn|crank|scale) up (the )?(text|font)|(bump|turn|crank) (the )?(text|font)( size)? up)\b/,
       label: "larger text",
       patch: (c) => ({ textScale: Math.min(2, Number((c.textScale + STEP).toFixed(2))) })
     },
     {
-      test: /\b((smaller|decrease|reduce) (the )?(text|font)|(?:text|font)( size)? smaller|make (the )?(text|font) smaller)\b/,
+      test: /\b((smaller|decrease|reduce) (the )?(text|font)|(?:text|font)( size)? smaller|make (the )?(text|font) smaller|(turn|bring|scale) down (the )?(text|font)|(turn|bring) (the )?(text|font)( size)? down)\b/,
       label: "smaller text",
       patch: (c) => ({ textScale: Math.max(1, Number((c.textScale - STEP).toFixed(2))) })
     },
@@ -640,6 +640,7 @@
   // src/lib/persistence.ts
   var STORAGE_KEY = "voicevision.state";
   var SCHEMA_VERSION = 1;
+  var BOOT_STYLE_ID = "vv-boot-style";
   function boundedNumber(value, fallback, min, max) {
     return typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
   }
@@ -679,10 +680,13 @@
     }
     return state;
   }
+  var BOOT_FILTER_PATTERN = /^(?:[a-z-]+\([0-9.]+(?:%|deg)?\) ?)+$/;
   var BOOT_SCRIPT = `(function(){try{
 var r=JSON.parse(localStorage.getItem(${JSON.stringify(STORAGE_KEY)})||'null');
 if(!r||r.version!==${SCHEMA_VERSION}||!r.state)return;
 if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');document.documentElement.style.colorScheme='dark';}
+var f=r.boot&&r.boot.filter;
+if(typeof f==='string'&&f!=='none'&&${BOOT_FILTER_PATTERN}.test(f)){var s=document.createElement('style');s.id=${JSON.stringify(BOOT_STYLE_ID)};s.textContent='body{filter:'+f+'}';document.head.appendChild(s);}
 }catch(e){}})();`;
 
   // src/lib/command.ts
