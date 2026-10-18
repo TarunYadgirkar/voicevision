@@ -333,3 +333,13 @@ describe('plain descriptions of a reading problem', () => {
     expect(parse('The screen is too bright').explanation).toBe('Applied a dimmer screen.');
   });
 });
+
+it.each(['bump up the font size', 'turn up the text', 'turn the font size up', 'crank up the text size'])('reads "%s" as larger text, not zoom', phrase => {
+  const command = parse(phrase);
+  expect(command.textScale).toBe(1.2);
+  expect(command.zoom).toBeNull();
+});
+
+it.each(['turn down the font size', 'bring the text size down'])('reads "%s" as smaller text', phrase => {
+  expect(parse(phrase, { textScale: 1.6 }).textScale).toBe(1.4);
+});
