@@ -1,4 +1,5 @@
 import { FilterState, defaultFilterState, defaultIntensities } from '@/types';
+import { buildFilterString } from '@/lib/filters';
 
 export const STORAGE_KEY = 'voicevision.state';
 export const SCHEMA_VERSION = 1;
@@ -43,6 +44,16 @@ export function normalizeFilterState(value: unknown): FilterState {
 interface StoredRecord {
   version: number;
   state: FilterState;
+  boot?: { filter: string };
+}
+
+const BOOT_FILTER_PATTERN = /^(?:[a-z-]+\([0-9.]+(?:%|deg)?\) ?)+$/;
+
+// url(#…) colour filters cannot resolve before the SVG defs render, so only plain CSS
+// functions are painted early; the engine applies the full filter once the app mounts.
+export function bootFilter(state: FilterState): string {
+  const paintable = state.colorMode === 'achromatopsia' ? state : { ...state, colorMode: null };
+  return buildFilterString(paintable);
 }
 
 export function saveState(state: FilterState): void {
@@ -50,6 +61,7 @@ export function saveState(state: FilterState): void {
   const record: StoredRecord = {
     version: SCHEMA_VERSION,
     state: savedState,
+    boot: { filter: bootFilter(savedState) },
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(record));
@@ -88,4 +100,6 @@ export const BOOT_SCRIPT = `(function(){try{
 var r=JSON.parse(localStorage.getItem(${JSON.stringify(STORAGE_KEY)})||'null');
 if(!r||r.version!==${SCHEMA_VERSION}||!r.state)return;
 if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');document.documentElement.style.colorScheme='dark';}
+var f=r.boot&&r.boot.filter;
+if(typeof f==='string'&&f!=='none'&&${BOOT_FILTER_PATTERN}.test(f)){var s=document.createElement('style');s.id=${JSON.stringify(BOOT_STYLE_ID)};s.textContent='body{filter:'+f+'}';document.head.appendChild(s);}
 }catch(e){}})();`;
