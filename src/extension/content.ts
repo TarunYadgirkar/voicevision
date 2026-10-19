@@ -23,6 +23,9 @@ type Scope = 'site' | 'global';
 const PREFIX = 'vv-';
 const GLOBAL_KEY = 'vvState';
 const SCOPE_KEY = 'vvScope';
+const ENABLED_KEY = 'vvEnabled';
+const OFF_MESSAGE = 'VoiceVision is off. Switch it on to change this page.';
+const CHANGING_MESSAGES = new Set(['APPLY_COMMAND', 'SET_READING', 'UNDO', 'REPLACE_STATE', 'TOGGLE_FILTER', 'SET_INTENSITY', 'vv:interpret']);
 
 declare global {
   interface Window {
@@ -84,6 +87,8 @@ function init(): void {
   }
 
   let scope: Scope = 'global';
+  // Off strips every change from the page but keeps saved settings for when it is switched back on.
+  let enabled = true;
   let state = hydrate(undefined);
   let previousState: FilterState | null = null;
   let revision = 0;
@@ -95,6 +100,11 @@ function init(): void {
   }
 
   function applyAll(): void {
+    if (!enabled) {
+      resetFilters();
+      restorePageAppearance();
+      return;
+    }
     updateColorMatrices(state.intensities.colorMode, PREFIX);
     // Safari does not render CSS `filter` on <html>, so it goes on <body>; every fixed
     // overlay therefore hangs off <html>, which is not a containing block for them.
@@ -179,13 +189,19 @@ function init(): void {
     });
   }
 
-  chrome.storage.local.get(SCOPE_KEY, data => {
+  chrome.storage.local.get([SCOPE_KEY, ENABLED_KEY], data => {
+    enabled = data[ENABLED_KEY] !== false;
     loadScoped(data[SCOPE_KEY] === 'site' ? 'site' : 'global');
   });
 
   // Pick up state changes made from other tabs on the same scope key.
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
+    const power = changes[ENABLED_KEY];
+    if (power && (power.newValue !== false) !== enabled) {
+      enabled = power.newValue !== false;
+      applyAll();
+    }
     const change = changes[storageKey(scope)];
     if (!change?.newValue) return;
     const next = hydrate(change.newValue);
@@ -245,6 +261,7 @@ function init(): void {
     | { type: 'TOGGLE_FILTER'; key: string }
     | { type: 'SET_INTENSITY'; key: string; value: number }
     | { type: 'vv:scope'; scope: Scope }
+    | { type: 'vv:enabled'; enabled?: unknown }
     | { type: 'vv:interpret'; transcript: string };
 
   type Reply = (response: unknown) => void;
@@ -332,6 +349,15 @@ function init(): void {
     return true;
     }
 
+  function enabledMessage(message: Extract<Message, { type: 'vv:enabled' }>, sendResponse: Reply): boolean | void {
+    if (typeof message.enabled === 'boolean' && message.enabled !== enabled) {
+      enabled = message.enabled;
+      chrome.storage.local.set({ [ENABLED_KEY]: enabled });
+      applyAll();
+    }
+    sendResponse({ enabled, state });
+    }
+
   function interpretMessage(message: Extract<Message, { type: 'vv:interpret' }>, sendResponse: Reply): boolean | void {
     if (typeof message.transcript !== 'string' || !message.transcript.trim() || message.transcript.length > 300) { sendResponse({ handled: false, revision }); return; }
     const command = parseIntent(message.transcript, state);
@@ -346,17 +372,23 @@ function init(): void {
     }
 
 
+  type Handler = (message: Message, sendResponse: Reply) => boolean | void;
+  const handlers: Record<Message['type'], Handler> = {
+    GET_STATE: getState as Handler,
+    APPLY_COMMAND: applyCommandMessage as Handler,
+    UNDO: undoMessage as Handler,
+    REPLACE_STATE: replaceStateMessage as Handler,
+    SET_READING: setReadingMessage as Handler,
+    TOGGLE_FILTER: toggleFilterMessage as Handler,
+    SET_INTENSITY: setIntensityMessage as Handler,
+    'vv:scope': scopeMessage as Handler,
+    'vv:interpret': interpretMessage as Handler,
+    'vv:enabled': enabledMessage as Handler,
+  };
+
   chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) => {
-    switch (message.type) {
-      case 'GET_STATE': return getState(message, sendResponse);
-      case 'APPLY_COMMAND': return applyCommandMessage(message, sendResponse);
-      case 'UNDO': return undoMessage(message, sendResponse);
-      case 'REPLACE_STATE': return replaceStateMessage(message, sendResponse);
-      case 'SET_READING': return setReadingMessage(message, sendResponse);
-      case 'TOGGLE_FILTER': return toggleFilterMessage(message, sendResponse);
-      case 'SET_INTENSITY': return setIntensityMessage(message, sendResponse);
-      case 'vv:scope': return scopeMessage(message, sendResponse);
-      case 'vv:interpret': return interpretMessage(message, sendResponse);
-    }
+    if (!Object.hasOwn(handlers, message?.type)) return;
+    if (!enabled && CHANGING_MESSAGES.has(message.type)) { sendResponse({ error: OFF_MESSAGE, enabled }); return; }
+    return handlers[message.type](message, sendResponse);
   });
 }

@@ -337,7 +337,7 @@
     };
   }
   function normalize(transcript) {
-    return transcript.toLowerCase().replace(/[^a-z0-9\s'-]/g, " ").replace(/\s+/g, " ").trim();
+    return transcript.toLowerCase().replace(/[^a-z0-9\s'-]/g, " ").replace(/\bcolour/g, "color").replace(/\s+/g, " ").trim();
   }
   function clamp01(value) {
     return Math.min(1, Math.max(0, value));
@@ -366,12 +366,12 @@
     { test: /\b(wrap (the )?(text|lines|long lines)|word wrap|reflow text)\b/, label: "text wrapping", patch: { textWrap: true } },
     { test: /\b(less glare|reduce glare|too much glare|softer light)\b/, label: "softer light", patch: { brightness: 0.8, warmTone: true } },
     {
-      test: /\b((text|words|letters|print|font) (is|are) too small|(bigger|larger|increase|enlarge) (the )?(text|font)|(?:text|font)( size)? (bigger|larger)|make (the )?(text|font) (bigger|larger))\b/,
+      test: /\b((text|words|letters|print|font) (is|are) too small|(bigger|larger|increase|enlarge) (the )?(text|font)|(?:text|font)( size)? (bigger|larger)|make (the )?(text|font) (bigger|larger)|(bump|turn|crank|scale) up (the )?(text|font)|(bump|turn|crank) (the )?(text|font)( size)? up)\b/,
       label: "larger text",
       patch: (c) => ({ textScale: Math.min(2, Number((c.textScale + STEP).toFixed(2))) })
     },
     {
-      test: /\b((smaller|decrease|reduce) (the )?(text|font)|(?:text|font)( size)? smaller|make (the )?(text|font) smaller)\b/,
+      test: /\b((smaller|decrease|reduce) (the )?(text|font)|(?:text|font)( size)? smaller|make (the )?(text|font) smaller|(turn|bring|scale) down (the )?(text|font)|(turn|bring) (the )?(text|font)( size)? down)\b/,
       label: "smaller text",
       patch: (c) => ({ textScale: Math.max(1, Number((c.textScale - STEP).toFixed(2))) })
     },
@@ -640,6 +640,7 @@
   // src/lib/persistence.ts
   var STORAGE_KEY = "voicevision.state";
   var SCHEMA_VERSION = 1;
+  var BOOT_STYLE_ID = "vv-boot-style";
   function boundedNumber(value, fallback, min, max) {
     return typeof value === "number" && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
   }
@@ -679,10 +680,13 @@
     }
     return state;
   }
+  var BOOT_FILTER_PATTERN = /^(?:[a-z-]+\([0-9.]+(?:%|deg)?\) ?)+$/;
   var BOOT_SCRIPT = `(function(){try{
 var r=JSON.parse(localStorage.getItem(${JSON.stringify(STORAGE_KEY)})||'null');
 if(!r||r.version!==${SCHEMA_VERSION}||!r.state)return;
 if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');document.documentElement.style.colorScheme='dark';}
+var f=r.boot&&r.boot.filter;
+if(typeof f==='string'&&f!=='none'&&${BOOT_FILTER_PATTERN}.test(f)){var s=document.createElement('style');s.id=${JSON.stringify(BOOT_STYLE_ID)};s.textContent='body{filter:'+f+'}';document.head.appendChild(s);}
 }catch(e){}})();`;
 
   // src/lib/command.ts
@@ -712,28 +716,29 @@ if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');do
     const result = {};
     for (const key of INTENSITY_KEYS) {
       const item = value[key];
-      if (item === void 0) continue;
+      if (item == null) continue;
       if (!inRange(item, 0, 1)) return false;
       result[key] = item;
     }
     return result;
   }
   function validClear(value) {
-    return value === void 0 || Array.isArray(value) && value.every((key) => ["zoom", "colorMode", "hemianopia"].includes(key));
+    return value == null || Array.isArray(value) && value.every((key) => ["zoom", "colorMode", "hemianopia"].includes(key));
+  }
+  function validShape(value) {
+    return isRecord(value) && (value.reset == null || typeof value.reset === "boolean") && (value.explanation == null || typeof value.explanation === "string") && validFields(value) && validClear(value.clear);
   }
   function validateCommand(value) {
-    if (!isRecord(value) || typeof value.reset !== "boolean") return null;
-    if (!validFields(value) || !validClear(value.clear)) return null;
-    if (value.explanation !== void 0 && typeof value.explanation !== "string") return null;
+    if (!validShape(value)) return null;
     const intensities = parseIntensities(value.intensities);
     if (intensities === false) return null;
     const keys = [...BOOLEAN_KEYS, ...Object.keys(ENUMS), ...Object.keys(RANGES)];
     const fields = Object.fromEntries(keys.map((key) => [key, value[key] ?? null]));
     return {
       ...fields,
-      reset: value.reset,
+      reset: value.reset === true,
       intensities,
-      ...value.clear === void 0 ? {} : { clear: value.clear },
+      ...value.clear == null ? {} : { clear: value.clear },
       explanation: typeof value.explanation === "string" ? value.explanation.slice(0, 400) : "Reading settings updated."
     };
   }
@@ -759,6 +764,9 @@ if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');do
   var PREFIX = "vv-";
   var GLOBAL_KEY = "vvState";
   var SCOPE_KEY = "vvScope";
+  var ENABLED_KEY = "vvEnabled";
+  var OFF_MESSAGE = "VoiceVision is off. Switch it on to change this page.";
+  var CHANGING_MESSAGES = /* @__PURE__ */ new Set(["APPLY_COMMAND", "SET_READING", "UNDO", "REPLACE_STATE", "TOGGLE_FILTER", "SET_INTENSITY", "vv:interpret"]);
   if (!window.__voicevisionInjected) {
     window.__voicevisionInjected = true;
     init();
@@ -802,6 +810,7 @@ if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');do
       document.documentElement.style.setProperty("zoom", originalZoom, originalZoomPriority);
     }
     let scope = "global";
+    let enabled = true;
     let state = hydrate(void 0);
     let previousState = null;
     let revision = 0;
@@ -811,6 +820,11 @@ if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');do
       revision += 1;
     }
     function applyAll() {
+      if (!enabled) {
+        resetFilters();
+        restorePageAppearance();
+        return;
+      }
       updateColorMatrices(state.intensities.colorMode, PREFIX);
       const filter = buildFilterString(state, PREFIX);
       if (filter === "none") {
@@ -888,11 +902,17 @@ if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');do
         done?.();
       });
     }
-    chrome.storage.local.get(SCOPE_KEY, (data) => {
+    chrome.storage.local.get([SCOPE_KEY, ENABLED_KEY], (data) => {
+      enabled = data[ENABLED_KEY] !== false;
       loadScoped(data[SCOPE_KEY] === "site" ? "site" : "global");
     });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
+      const power = changes[ENABLED_KEY];
+      if (power && power.newValue !== false !== enabled) {
+        enabled = power.newValue !== false;
+        applyAll();
+      }
       const change = changes[storageKey(scope)];
       if (!change?.newValue) return;
       const next = hydrate(change.newValue);
@@ -1029,6 +1049,14 @@ if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');do
       });
       return true;
     }
+    function enabledMessage(message, sendResponse) {
+      if (typeof message.enabled === "boolean" && message.enabled !== enabled) {
+        enabled = message.enabled;
+        chrome.storage.local.set({ [ENABLED_KEY]: enabled });
+        applyAll();
+      }
+      sendResponse({ enabled, state });
+    }
     function interpretMessage(message, sendResponse) {
       if (typeof message.transcript !== "string" || !message.transcript.trim() || message.transcript.length > 300) {
         sendResponse({ handled: false, revision });
@@ -1047,27 +1075,25 @@ if(r.state.darkMode===true){document.documentElement.classList.add('vv-dark');do
       sendResponse({ handled: true, command, state });
       return;
     }
+    const handlers = {
+      GET_STATE: getState,
+      APPLY_COMMAND: applyCommandMessage,
+      UNDO: undoMessage,
+      REPLACE_STATE: replaceStateMessage,
+      SET_READING: setReadingMessage,
+      TOGGLE_FILTER: toggleFilterMessage,
+      SET_INTENSITY: setIntensityMessage,
+      "vv:scope": scopeMessage,
+      "vv:interpret": interpretMessage,
+      "vv:enabled": enabledMessage
+    };
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-      switch (message.type) {
-        case "GET_STATE":
-          return getState(message, sendResponse);
-        case "APPLY_COMMAND":
-          return applyCommandMessage(message, sendResponse);
-        case "UNDO":
-          return undoMessage(message, sendResponse);
-        case "REPLACE_STATE":
-          return replaceStateMessage(message, sendResponse);
-        case "SET_READING":
-          return setReadingMessage(message, sendResponse);
-        case "TOGGLE_FILTER":
-          return toggleFilterMessage(message, sendResponse);
-        case "SET_INTENSITY":
-          return setIntensityMessage(message, sendResponse);
-        case "vv:scope":
-          return scopeMessage(message, sendResponse);
-        case "vv:interpret":
-          return interpretMessage(message, sendResponse);
+      if (!Object.hasOwn(handlers, message?.type)) return;
+      if (!enabled && CHANGING_MESSAGES.has(message.type)) {
+        sendResponse({ error: OFF_MESSAGE, enabled });
+        return;
       }
+      return handlers[message.type](message, sendResponse);
     });
   }
 })();

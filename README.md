@@ -11,9 +11,9 @@ Live: https://voicevision-eight.vercel.app
 ## What works
 
 - Text size (100–200%), line spacing, optional long-line wrapping, brightness, contrast, color and motion adjustments. Standard typing areas are included without changing their words.
-- Need-based starting points, a personal reading preview, saved preferences, undo and reset.
+- Need-based starting points, a personal reading preview, saved preferences, undo and reset. Saved brightness, contrast and dark mode are painted before the page first renders, so a reload does not flash the default look; colour adjustments follow a moment later because their SVG filters load with the page.
 - Keyboard controls and native radio groups; microphone errors explain typing/manual alternatives.
-- Chrome/Edge extension applies the shared engine to ordinary webpages, with settings per site or globally.
+- Chrome/Edge extension applies the shared engine to ordinary webpages, with settings per site or globally. Its on/off switch restores every site's own look and keeps your settings for when you switch back on. Strength sliders appear for each display or colour adjustment that is on, and each typed result says whether it was understood on this device or by Gemini.
 - Cloud interpretation is off by default. Enable it to send unfamiliar command text and settings to the server and Google Gemini. Page content is not sent. Browser speech recognition may use the browser vendor's speech service separately.
 
 These are adjustable access tools, not treatment. Blindness in one eye is different from loss of half the visual field. VoiceVision does not mask half the display to “help” either condition. Condition-only commands leave settings unchanged; compound requests apply only the requested adjustment. Color shifts and warm tint are optional preferences, not proven vision correction or eye protection. See [evidence and limits](docs/EVIDENCE.md) and [software validation](docs/VALIDATION.md).
@@ -50,18 +50,18 @@ npm run build:ext
 3. Enable Developer mode, choose Load unpacked, select `extension/`.
 4. Open an ordinary website, then open VoiceVision from the toolbar.
 
-Typing and manual controls are available in the popup. Alt+Shift+V opens it. Browser settings pages, extension stores, and some protected/PDF pages cannot be changed. Manual installation remains required; there is no Chrome Web Store release yet. See [extension privacy](extension/PRIVACY.md).
+Typing, manual controls, strength sliders and an on/off switch for all sites are available in the popup. Alt+Shift+V opens it. Browser settings pages, extension stores, and some protected/PDF pages cannot be changed. Manual installation remains required; there is no Chrome Web Store release yet. See [extension privacy](extension/PRIVACY.md).
 
 ## Deployment and security boundaries
 
-Next.js API uses validated command input/output and a server-only Gemini key. Local parser handles common requests; cloud responses time out and obsolete replies cannot overwrite newer settings. Rate limiting caps each client at 20/minute and each server instance at 100/minute, with bounded tracked keys. This is a per-instance quota guard, not distributed abuse protection or authentication. A public launch needs deployment-level/shared quotas and provider spending limits.
+Next.js API uses validated command input/output and a server-only Gemini key. Model replies set unmentioned fields to null, and validation treats null as "not set" rather than rejecting the reply. Local parser handles common requests; cloud responses time out and obsolete replies cannot overwrite newer settings. Rate limiting caps each client at 20/minute and each server instance at 100/minute, with bounded tracked keys. This is a per-instance quota guard, not distributed abuse protection or authentication. A public launch needs deployment-level/shared quotas and provider spending limits.
 
 Production dependency audit was clean during October 2, 2026 checks. Development dependencies have upstream advisories; do not expose development/test servers publicly. Product changes still require checks with disabled users and live assistive technology; software tests do not establish clinical effectiveness.
 
 ## History
 
 - **June 2026:** first built at the AI Collective Tri-Valley hackathon as a voice-driven screen filter.
-- **September 2026:** a later variant, ClearSay (renamed Vision Assist), was built at the Berkeley x DeepMind hackathon as a Vite web app and Chrome extension that added a Gemini Computer Use browser agent and condition-based field-loss masks. This repository supersedes it. Its colour correction used the same daltonization matrices as VoiceVision, and its masks and page-screenshot agent conflict with VoiceVision's rules (no field-loss masks, page content never sent to the cloud), so no code was carried over.
+- **September 2026:** a later variant, ClearSay (renamed Vision Assist), was built at the Berkeley x DeepMind hackathon as a Vite web app and Chrome extension that added a Gemini Computer Use browser agent and condition-based field-loss masks. This repository supersedes it. Its colour correction used the same daltonization matrices as VoiceVision, and its masks and page-screenshot agent conflict with VoiceVision's rules (no field-loss masks, page content never sent to the cloud), so neither was carried over. In October 2026 four smaller ideas from it were ported: British spellings such as "colour", the extension on/off switch, popup strength sliders with an on-device or Gemini badge, and pre-paint restoring of saved filters. Its null-tolerant reading of model replies also fixed VoiceVision's cloud interpretation, which had rejected every Gemini reply.
 - **October 2026:** rebuilt as an accessible reading workspace with a native Mac companion and a multi-browser extension.
 
 Current architecture and agent rules: [AGENTS.md](AGENTS.md).

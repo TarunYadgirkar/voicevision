@@ -77,3 +77,33 @@ it('toggles wrapping off and restores authored whitespace', () => {
   send({ type: 'TOGGLE_FILTER', key: 'textWrap' });
   expect(document.querySelector('pre')!.style.whiteSpace).toBe('pre');
 });
+
+it('switching off restores the page, keeps settings and blocks changes until switched on', () => {
+  send({ type: 'vv:interpret', transcript: 'larger text' });
+  send({ type: 'vv:interpret', transcript: 'dark mode' });
+  const off = send({ type: 'vv:enabled', enabled: false });
+  expect(off).toMatchObject({ enabled: false, state: { darkMode: true, textScale: 1.2 } });
+  expect(stored.vvEnabled).toBe(false);
+  expect(document.querySelector('p')!.style.fontSize).toBe('20px');
+  expect(document.body.style.filter).toBe('saturate(80%)');
+  expect(document.documentElement.style.colorScheme).toBe('light');
+  expect(send({ type: 'vv:interpret', transcript: 'bold text' })).toHaveProperty('error');
+  expect(send({ type: 'UNDO' })).toHaveProperty('error');
+  send({ type: 'vv:enabled', enabled: true });
+  expect(document.querySelector('p')!.style.fontSize).toBe('24px');
+  expect(document.documentElement.style.colorScheme).toBe('dark');
+});
+
+it('follows the switch when another tab changes it', () => {
+  send({ type: 'vv:interpret', transcript: 'larger text' });
+  storageChanged({ vvEnabled: { newValue: false } }, 'local');
+  expect(document.querySelector('p')!.style.fontSize).toBe('20px');
+  expect(send({ type: 'vv:enabled' })).toMatchObject({ enabled: false });
+  storageChanged({ vvEnabled: { newValue: true } }, 'local');
+  expect(document.querySelector('p')!.style.fontSize).toBe('24px');
+});
+
+it('ignores unknown message types, including inherited object keys', () => {
+  expect(send({ type: 'toString' })).toBeUndefined();
+  expect(send({ type: 'DELETE_EVERYTHING' })).toBeUndefined();
+});

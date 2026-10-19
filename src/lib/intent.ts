@@ -41,7 +41,7 @@ function emptyCommand(): AccessibilityCommand {
 }
 
 function normalize(transcript: string): string {
-  return transcript.toLowerCase().replace(/[^a-z0-9\s'-]/g, ' ').replace(/\s+/g, ' ').trim();
+  return transcript.toLowerCase().replace(/[^a-z0-9\s'-]/g, ' ').replace(/\bcolour/g, 'color').replace(/\s+/g, ' ').trim();
 }
 
 function clamp01(value: number): number {
@@ -78,12 +78,12 @@ const RELATIVE_RULES: ReadonlyArray<Rule> = [
   { test: /\b(wrap (the )?(text|lines|long lines)|word wrap|reflow text)\b/, label: 'text wrapping', patch: { textWrap: true } },
   { test: /\b(less glare|reduce glare|too much glare|softer light)\b/, label: 'softer light', patch: { brightness: 0.8, warmTone: true } },
   {
-    test: /\b((text|words|letters|print|font) (is|are) too small|(bigger|larger|increase|enlarge) (the )?(text|font)|(?:text|font)( size)? (bigger|larger)|make (the )?(text|font) (bigger|larger))\b/,
+    test: /\b((text|words|letters|print|font) (is|are) too small|(bigger|larger|increase|enlarge) (the )?(text|font)|(?:text|font)( size)? (bigger|larger)|make (the )?(text|font) (bigger|larger)|(bump|turn|crank|scale) up (the )?(text|font)|(bump|turn|crank) (the )?(text|font)( size)? up)\b/,
     label: 'larger text',
     patch: c => ({ textScale: Math.min(2, Number((c.textScale + STEP).toFixed(2))) }),
   },
   {
-    test: /\b((smaller|decrease|reduce) (the )?(text|font)|(?:text|font)( size)? smaller|make (the )?(text|font) smaller)\b/,
+    test: /\b((smaller|decrease|reduce) (the )?(text|font)|(?:text|font)( size)? smaller|make (the )?(text|font) smaller|(turn|bring|scale) down (the )?(text|font)|(turn|bring) (the )?(text|font)( size)? down)\b/,
     label: 'smaller text',
     patch: c => ({ textScale: Math.max(1, Number((c.textScale - STEP).toFixed(2))) }),
   },

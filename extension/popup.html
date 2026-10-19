@@ -2,11 +2,14 @@
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VoiceVision reading controls</title><link rel="stylesheet" href="popup.css"></head>
 <body>
-<header><h1>VoiceVision</h1><button id="openSiteBtn" type="button">Open app</button></header>
+<header><h1>VoiceVision</h1><button id="powerBtn" class="switch" type="button" role="switch" aria-checked="true" aria-label="Use VoiceVision" aria-describedby="powerHint"><span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span><span id="powerLabel" aria-hidden="true">On</span></button><button id="openSiteBtn" type="button">Open app</button></header>
+<p id="powerHint" class="sr-only">Turns VoiceVision on or off for every site. Your settings are kept.</p>
 <main>
 <p class="intro">Make this page easier to read. Choose what feels comfortable.</p>
+<p id="explanation" role="status" aria-live="polite"><span id="statusText">Connecting to this page…</span> <span id="sourceBadge" class="badge" hidden></span></p>
+<p id="offBanner" class="off-banner" hidden>VoiceVision is off on every site. Your settings are kept and come back when you switch it on.</p>
+<div id="pageControls">
 <div class="actions"><button id="undoBtn" type="button">Undo</button><button id="resetBtn" type="button">Reset all</button></div>
-<p id="explanation" role="status" aria-live="polite">Connecting to this page…</p>
 <form id="commandForm"><label for="commandInput">Type a command</label><input id="commandInput" maxlength="300" placeholder="Try “larger text”" aria-describedby="commandHint"><button type="submit">Apply command</button></form>
 <p id="commandHint" class="hint">Try “more spacing”, “less glare”, or “reset”.</p>
 <button id="micBtn" type="button" aria-pressed="false"><span id="micLabel">Speak a command</span></button>
@@ -15,6 +18,7 @@
 <section aria-labelledby="presetTitle"><h2 id="presetTitle">Start with your needs</h2><div class="toggle-grid"><button data-preset="reading" type="button">Larger, spaced text</button><button data-preset="glare" type="button">Less glare</button><button data-preset="contrast" type="button">Stronger contrast</button><button data-preset="calm" type="button">Less motion</button></div></section>
 <section aria-labelledby="readingTitle"><h2 id="readingTitle">Reading controls</h2><div id="filters"></div></section>
 <div id="controls"></div>
+</div>
 <p class="hint">Adjustments vary by website. Use browser zoom for more magnification. These tools do not diagnose or treat eye conditions.</p>
 </main><script src="popup.js"></script>
 </body></html>
